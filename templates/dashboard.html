@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MESA DOCK - Gestión de Muelles</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/breadcrumb.css">
+  <style>
+    /* Estilos específicos del dashboard */
+    .section-title {
+      width: 100%;
+      max-width: 900px;
+      text-align: left;
+      color: var(--color-primario-oscuro);
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 8px 0 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 2px;
+      background: linear-gradient(90deg, var(--color-card-border), transparent);
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #888;
+      padding: 24px;
+      font-size: 0.95rem;
+    }
+
+    .dock-status-bar {
+      margin-top: 24px;
+      width: 100%;
+      max-width: 900px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header global inyectado por globalHeader.js -->
+  <div class="header"></div>
+  <script src="/static/js/globalHeader.js" data-title="Gestión de Muelles"></script>
+
+  <!-- Breadcrumb EMESA (jerarquía Inicio > Configuración > Submenú) -->
+  <nav class="breadcrumb-wrapper" aria-label="Breadcrumb">
+    <div class="breadcrumb-container" id="breadcrumb"></div>
+  </nav>
+
+  <div class="main-container">
+    <!-- Estadísticas desde Supabase -->
+    <h2 class="section-title" data-original-text="Resumen del día">📊 Resumen del día</h2>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-value" id="statMuelles">--</div>
+        <div class="stat-label" data-original-text="Muelles activos">Muelles activos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statReservasHoy">--</div>
+        <div class="stat-label" data-original-text="Reservas hoy">Reservas hoy</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statPendientes">--</div>
+        <div class="stat-label" data-original-text="Pendientes">Pendientes</div>
+      </div>
+    </div>
+
+    <!-- Acciones principales -->
+    <h2 class="section-title" data-original-text="Acciones">⚡ Acciones</h2>
+    <div class="actions-grid">
+      <button class="action-card" id="cardReservaNueva" onclick="window.location.href='/reservas'">
+        <span class="action-icon">📅</span>
+        <span class="action-content">
+          <span class="action-title" data-original-text="Reservar Muelle">Reservar Muelle</span>
+          <span class="action-description" data-original-text="Calendario semanal de disponibilidad">Calendario semanal de disponibilidad</span>
+        </span>
+        <span class="action-arrow">→</span>
+      </button>
+
+      <button class="action-card" id="cardMisReservas" onclick="window.location.href='/mis-reservas'">
+        <span class="action-icon">📋</span>
+        <span class="action-content">
+          <span class="action-title" data-original-text="Mis Reservas">Mis Reservas</span>
+          <span class="action-description" data-original-text="Tus reservas: verlas, cancelarlas o modificarlas">Tus reservas: verlas, cancelarlas o modificarlas</span>
+        </span>
+        <span class="action-arrow">→</span>
+      </button>
+
+      <!-- Solo visible para admin (lo muestra app.js) -->
+      <button class="action-card" id="cardCalendario" onclick="window.location.href='/calendario'" style="display:none;">
+        <span class="action-icon">🗓️</span>
+        <span class="action-content">
+          <span class="action-title" data-original-text="Ver Calendario">Ver Calendario</span>
+          <span class="action-description" data-original-text="Vista semanal de reservas (solo lectura)">Vista semanal de reservas (solo lectura)</span>
+        </span>
+        <span class="action-arrow">→</span>
+      </button>
+
+      <button class="action-card" id="configCard" onclick="window.location.href='/configuracion'">
+        <span class="action-icon">⚙️</span>
+        <span class="action-content">
+          <span class="action-title" data-original-text="Configuración">Configuración</span>
+          <span class="action-description" data-original-text="Administración del sistema">Administración del sistema</span>
+        </span>
+        <span class="action-arrow">→</span>
+      </button>
+    </div>
+
+    <div class="footer-info">
+      <p data-original-text="MESA DOCK · Gestión de Muelles y Reservas">MESA DOCK · Gestión de Muelles y Reservas</p>
+      <p data-original-text="Conectado a Supabase">Conectado a Supabase</p>
+    </div>
+  </div>
+
+  <script src="/static/js/navegacion.js"></script>
+  <script src="/static/js/supabase.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/permisos.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/breadcrumb.js"></script>
+
+  <!-- Modal de login universal (se muestra si no hay sesión) -->
+  <script src="/static/js/loginModal.js"></script>
+</body>
+</html>

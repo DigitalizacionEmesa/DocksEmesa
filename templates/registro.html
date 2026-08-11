@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MESA DOCK - Crear cuenta</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 45%, #42a5f5 100%);
+      font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
+    }
+    .login-page {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+      width: 100%;
+      max-width: 580px;
+      overflow: hidden;
+      animation: fadeInUp 0.6s ease-out;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .login-card-header {
+      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+      color: #fff;
+      padding: 28px 28px 22px 28px;
+      text-align: center;
+    }
+    .login-logo {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .login-logo .logo-mark { width: 56px; height: 56px; }
+    .login-logo .logo-text {
+      font-size: 1.7rem; font-weight: 800; letter-spacing: 3px; line-height: 1; color: #fff;
+    }
+    .login-logo .logo-sub {
+      font-size: 0.8rem; letter-spacing: 5px; text-transform: uppercase; color: rgba(255,255,255,0.85);
+    }
+    .login-card-header h1 { margin: 8px 0 4px 0; font-size: 1.4rem; font-weight: 600; }
+    .login-card-header p { margin: 0; opacity: 0.9; font-size: 0.9rem; }
+    .login-card-body { padding: 28px 28px 24px 28px; }
+
+    .reg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+    .reg-field { margin-bottom: 16px; }
+    .reg-field.full { grid-column: 1 / -1; }
+    .reg-field label { display: block; margin-bottom: 6px; font-weight: 600; color: #333; font-size: 0.9rem; }
+    .reg-field input, .reg-field select {
+      width: 100%; padding: 11px 14px; border: 2px solid #e1e5e9; border-radius: 8px;
+      font-size: 0.95em; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      box-sizing: border-box; font-family: inherit; background: #fff;
+    }
+    .reg-field input:focus, .reg-field select:focus {
+      outline: none; border-color: #1976d2; box-shadow: 0 0 0 3px rgba(25,118,210,0.12);
+    }
+    .reg-field input.error { border-color: #dc3545; background-color: #fff5f5; }
+    .reg-field select:disabled {
+      background-color: #eef0f2; color: #9aa0a6; cursor: not-allowed;
+    }
+    .plantas-box {
+      border: 1.5px solid #d0d7de; border-radius: 8px; padding: 8px;
+      max-height: 170px; overflow-y: auto; background: #fafbfc;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+      align-content: start; justify-items: stretch;
+    }
+    .plantas-box label {
+      display: flex; align-items: center; gap: 8px; margin: 0;
+      padding: 7px 10px; cursor: pointer; font-weight: 500; font-size: 0.9rem;
+      color: #333; border-radius: 6px; text-align: left;
+      transition: background-color 0.15s ease;
+    }
+    .plantas-box label:hover { background-color: #e8f1fb; }
+    .plantas-box label:active { background-color: #dbe9f8; }
+    .plantas-box input[type="checkbox"] {
+      width: 17px; height: 17px; margin: 0; flex-shrink: 0;
+      accent-color: #1976d2; cursor: pointer;
+    }
+    .plantas-box .box-placeholder { grid-column: 1 / -1; }
+    @media (max-width: 420px) {
+      .plantas-box { grid-template-columns: 1fr; }
+    }
+
+    .login-message {
+      padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;
+      font-size: 0.9em; font-weight: 500; display: none; text-align: center;
+    }
+    .login-message.error { background-color: #fff5f5; color: #dc3545; border: 1px solid #f5c6cb; }
+    .login-message.success { background-color: #f8fff8; color: #155724; border: 1px solid #c3e6cb; }
+
+    .login-btn {
+      width: 100%; padding: 14px 24px; border: none; border-radius: 8px;
+      font-size: 1.05em; font-weight: 700; cursor: pointer;
+      background: linear-gradient(135deg, #1976d2 0%, #0d47a1 100%);
+      color: #fff; box-shadow: 0 4px 14px rgba(25,118,210,0.35);
+      transition: all 0.25s ease; display: flex; align-items: center; justify-content: center;
+      gap: 10px; font-family: inherit; letter-spacing: 0.5px;
+    }
+    .login-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(25,118,210,0.45); }
+    .login-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+    .login-spinner { display: inline-block; animation: spin 1s linear infinite; font-size: 1.2em; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .login-register { text-align: center; margin-top: 16px; }
+    .login-register a { color: #1976d2; font-weight: 600; text-decoration: none; }
+    .login-register a:hover { text-decoration: underline; }
+
+    .login-card-footer {
+      padding: 16px 28px 20px 28px; text-align: center; border-top: 1px solid #f1f3f4; background-color: #fafbfc;
+    }
+    .login-card-footer small { color: #6c757d; font-size: 0.85rem; }
+    .login-card-footer .brand { color: #d71920; font-weight: 700; letter-spacing: 1px; }
+
+    .login-langs { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+
+    @media (max-width: 520px) {
+      .reg-grid { grid-template-columns: 1fr; }
+      .login-card-body { padding: 24px 18px 20px 18px; }
+      .login-card-header { padding: 24px 18px 20px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-card-header">
+        <div class="login-logo">
+          <svg class="logo-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="mesaGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#e53935"/>
+                <stop offset="100%" stop-color="#b71c1c"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="30" fill="url(#mesaGrad)"/>
+            <path d="M 18 40 Q 26 22 34 34 T 48 30" stroke="#fff" stroke-width="6"
+                  fill="none" stroke-linecap="round"/>
+          </svg>
+          <span class="logo-text" data-original-text="MESA">MESA</span>
+          <span class="logo-sub" data-original-text="DOCK">DOCK</span>
+        </div>
+        <h1 data-original-text="Crear cuenta">Crear cuenta</h1>
+        <p data-original-text="Regístrate para empezar a gestionar muelles y reservas">Regístrate para empezar a gestionar muelles y reservas</p>
+      </div>
+
+      <div class="login-card-body">
+        <form id="registroForm" autocomplete="on">
+          <div class="reg-grid">
+            <div class="reg-field">
+              <label for="f_nombre" data-original-text="Nombre">Nombre</label>
+              <input type="text" id="f_nombre" required autocomplete="given-name">
+            </div>
+            <div class="reg-field">
+              <label for="f_apellidos" data-original-text="Apellidos">Apellidos</label>
+              <input type="text" id="f_apellidos" autocomplete="family-name">
+            </div>
+            <div class="reg-field full">
+              <label for="f_email" data-original-text="Email">Email</label>
+              <input type="email" id="f_email" required placeholder="usuario@empresa.com"
+                     data-original-placeholder="usuario@empresa.com" autocomplete="email">
+            </div>
+            <div class="reg-field full">
+              <label for="f_password" data-original-text="Contraseña">Contraseña</label>
+              <input type="password" id="f_password" required minlength="6"
+                     placeholder="••••••••" autocomplete="new-password">
+            </div>
+            <div class="reg-field full">
+              <label for="f_rol_id" data-original-text="Rol">Rol</label>
+              <select id="f_rol_id" required></select>
+            </div>
+            <div class="reg-field">
+              <label for="f_departamento_id" data-original-text="Departamento">Departamento</label>
+              <select id="f_departamento_id"></select>
+            </div>
+            <div class="reg-field">
+              <label for="f_proveedor_id" data-original-text="Proveedor">Proveedor</label>
+              <select id="f_proveedor_id"></select>
+            </div>
+            <div class="reg-field full">
+              <label data-original-text="Plantas asignadas">Plantas asignadas</label>
+              <div class="plantas-box" id="plantasBox">
+                <div class="box-placeholder" style="color:#888;font-size:.85rem;" data-original-text="Cargando...">Cargando...</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="registroMessage" class="login-message"></div>
+
+          <button type="submit" class="login-btn" id="registroBtn">
+            <span class="login-btn-text" data-original-text="Crear cuenta">Crear cuenta</span>
+            <span class="login-spinner" style="display:none;">⟳</span>
+          </button>
+        </form>
+
+        <div class="login-register">
+          <a href="/" data-original-text="¿Ya tienes cuenta? Inicia sesión">¿Ya tienes cuenta? Inicia sesión</a>
+        </div>
+
+        <div class="login-langs">
+          <button class="flag-btn es active" data-lang="es" title="Español"></button>
+          <button class="flag-btn uk" data-lang="en" title="English"></button>
+          <button class="flag-btn cz" data-lang="cs" title="Čeština"></button>
+        </div>
+      </div>
+
+      <div class="login-card-footer">
+        <small data-original-text="Conectado a Supabase · Gestión de muelles en tiempo real">
+          Conectado a Supabase · Gestión de muelles en tiempo real
+        </small>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/supabase.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/registro.js"></script>
+  <script src="/static/js/globalHeader.js" data-title="MESA DOCK" data-auto-init="false"></script>
+</body>
+</html>

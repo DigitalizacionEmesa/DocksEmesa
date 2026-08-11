@@ -1,0 +1,9 @@
+Quiero crear una app sencilla con supabase auth y base de datos en supabase publicada en netlify como hosting que sirva para reservas de muelles en nuestras empresas. 
+
+Quiero que se puedan crear plantas, naves, muelles, en 3 niveles de mas a menos (Emesa, Nave 1 y Nave 2, Muelle 1 Nave 1, Muelle 2 Nave 1, Muelle 1 Nave 2, Muelle 1 Nave 3), configurar disponibilidades por muelle. Para registrarme tanto en Supabase como en netlify, quiero usar la cuenta de digitalization.sccz@saveragroup.com, con la misma contraseña de nuestra cuenta de correo, el proyecto en Supabase se llamara SCCZ y dentro tendremos nuestras tablas y vistas para la app. 
+
+El objetivo de la app será la planificacion de cargas y descargas en los muelles de la empresa y servirá para uso interno y externo. Hay que crear un sistema de autenticacion y recuperacion de contraseñas conectado a supabase auth, el usuario interno al mandar la invitacion asignara al proveedor planta y muelles disponibles ya que no todos los productos se descargan en cualquier muelle y menos en cualquier planta. 
+
+Para la creacion de la cuenta se tiene que "invitar" internamente por un admin (conectar app a mail). La app constara de un calendario para revision a nivel interno de lo planificado en cada hora y cada muelle. Por otra parte, crearemos otro html para usuario externo para coger citas, en que vea la disponibilidad. 
+
+Esta disponibilidad, una vez seleccionado el dia, aparecerá en píldoras separados por media hora, para clic y reserva. Este html para uso externo, tendrá que ser para movil y para PC. DIme cual es la mejor forma de que en ambos se vea perfecto como si fuera su dispositivo nativo. Define la app completa para que quede como un funcional, si hay alguna duda, por favor dime. Se tendran que crear RLS, en primer lugar con limitacion para auth y luego por categorias, proveedores, departamentos, etc. (para esta ultima gestion, igual hay que crear una tabla adicional usuarios).  

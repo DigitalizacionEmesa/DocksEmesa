@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MESA DOCK - Iniciar Sesión</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    /* ======= Pantalla de login a pantalla completa ======= */
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 45%, #42a5f5 100%);
+      font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
+    }
+
+    .login-page {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+      width: 100%;
+      max-width: 440px;
+      overflow: hidden;
+      animation: fadeInUp 0.6s ease-out;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .login-card-header {
+      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+      color: #fff;
+      padding: 32px 28px 26px 28px;
+      text-align: center;
+      position: relative;
+    }
+
+    .login-logo {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .login-logo .logo-mark {
+      width: 64px;
+      height: 64px;
+    }
+
+    .login-logo .logo-text {
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: 3px;
+      line-height: 1;
+      color: #fff;
+    }
+
+    .login-logo .logo-sub {
+      font-size: 0.85rem;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .login-card-header h1 {
+      margin: 10px 0 6px 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .login-card-header p {
+      margin: 0;
+      opacity: 0.9;
+      font-size: 0.95rem;
+    }
+
+    .login-card-body {
+      padding: 32px 28px 28px 28px;
+    }
+
+    .login-field {
+      margin-bottom: 20px;
+    }
+
+    .login-field label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #333;
+      font-size: 0.95rem;
+    }
+
+    .login-field input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e1e5e9;
+      border-radius: 8px;
+      font-size: 1em;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      box-sizing: border-box;
+      font-family: inherit;
+      background: #fff;
+      margin-bottom: 0;
+    }
+
+    .login-field input:focus {
+      outline: none;
+      border-color: #1976d2;
+      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.12);
+    }
+
+    .login-field input.error {
+      border-color: #dc3545;
+      background-color: #fff5f5;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    .login-message {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 0.9em;
+      font-weight: 500;
+      display: none;
+      text-align: center;
+    }
+
+    .login-message.error {
+      background-color: #fff5f5;
+      color: #dc3545;
+      border: 1px solid #f5c6cb;
+    }
+
+    .login-message.success {
+      background-color: #f8fff8;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.05em;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, #d71920 0%, #b71c1c 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(215, 25, 32, 0.35);
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: inherit;
+      letter-spacing: 0.5px;
+    }
+
+    .login-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(215, 25, 32, 0.45);
+    }
+
+    .login-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .login-spinner {
+      display: inline-block;
+      animation: spin 1s linear infinite;
+      font-size: 1.2em;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .login-card-footer {
+      padding: 18px 28px 24px 28px;
+      text-align: center;
+      border-top: 1px solid #f1f3f4;
+      background-color: #fafbfc;
+    }
+
+    .login-card-footer small {
+      color: #6c757d;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .login-card-footer .brand {
+      color: #d71920;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    /* Selector de idioma dentro del login */
+    .login-langs {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 14px;
+    }
+
+    .login-register { text-align: center; margin-top: 16px; }
+    .login-register a { color: #1976d2; font-weight: 600; text-decoration: none; }
+    .login-register a:hover { text-decoration: underline; }
+
+    @media (max-width: 480px) {
+      .login-card-body { padding: 26px 20px 22px 20px; }
+      .login-card-header { padding: 26px 20px 22px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <!-- Cabecera con marca MESA -->
+      <div class="login-card-header">
+        <div class="login-logo">
+          <!-- Emblema MESA (swoosh rojo) -->
+          <svg class="logo-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="mesaGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#e53935"/>
+                <stop offset="100%" stop-color="#b71c1c"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="30" fill="url(#mesaGrad)"/>
+            <path d="M 18 40 Q 26 22 34 34 T 48 30" stroke="#fff" stroke-width="6"
+                  fill="none" stroke-linecap="round"/>
+          </svg>
+          <span class="logo-text" data-original-text="MESA">MESA</span>
+          <span class="logo-sub" data-original-text="DOCK">DOCK</span>
+        </div>
+        <h1 data-original-text="Iniciar Sesión">Iniciar Sesión</h1>
+        <p data-original-text="Plataforma de gestión de muelles y reservas">Plataforma de gestión de muelles y reservas</p>
+      </div>
+
+      <!-- Formulario -->
+      <div class="login-card-body">
+        <form id="loginForm" autocomplete="on">
+          <div class="login-field">
+            <label for="email" data-original-text="Email">Email</label>
+            <input type="email" id="email" name="email"
+                   placeholder="usuario@empresa.com"
+                   data-original-placeholder="usuario@empresa.com"
+                   required autocomplete="email">
+          </div>
+
+          <div class="login-field">
+            <label for="password" data-original-text="Contraseña">Contraseña</label>
+            <input type="password" id="password" name="password"
+                   placeholder="••••••••"
+                   data-original-placeholder="••••••••"
+                   required autocomplete="current-password">
+          </div>
+
+          <div id="loginMessage" class="login-message"></div>
+
+          <button type="submit" class="login-btn" id="loginBtn">
+            <span class="login-btn-text" data-original-text="Entrar">Entrar</span>
+            <span class="login-spinner" style="display: none;">⟳</span>
+          </button>
+        </form>
+
+        <!-- Registro -->
+        <div class="login-register">
+          <a href="/registro" data-original-text="¿No tienes cuenta? Regístrate">¿No tienes cuenta? Regístrate</a>
+        </div>
+
+        <!-- Selector de idioma -->
+        <div class="login-langs">
+          <button class="flag-btn es active" data-lang="es" title="Español"></button>
+          <button class="flag-btn uk" data-lang="en" title="English"></button>
+          <button class="flag-btn cz" data-lang="cs" title="Čeština"></button>
+        </div>
+      </div>
+
+      <div class="login-card-footer">
+        <small data-original-text="Conectado a Supabase · Gestión de muelles en tiempo real">
+          Conectado a Supabase · Gestión de muelles en tiempo real
+        </small>
+        <br>
+        <small><span class="brand">MESA DOCK</span> v1.0</small>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/supabase.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script>
+    // ====================================================================
+    // LOGIN - MESA DOCK
+    // ====================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      // Si ya hay sesión, ir directo al dashboard
+      if (window.Auth && Auth.isAuthenticated()) {
+        window.location.href = '/dashboard';
+        return;
+      }
+
+      // Inicializar selector de idioma
+      initLoginLanguage();
+
+      const form = document.getElementById('loginForm');
+      const messageDiv = document.getElementById('loginMessage');
+      const emailInput = document.getElementById('email');
+      const passwordInput = document.getElementById('password');
+      const btn = document.getElementById('loginBtn');
+      const btnText = btn.querySelector('.login-btn-text');
+      const spinner = btn.querySelector('.login-spinner');
+
+      const t = (key) => (window.GlobalHeader && window.GlobalHeader.translate)
+                         ? window.GlobalHeader.translate(key) : key;
+
+      function showMessage(text, type) {
+        messageDiv.textContent = text;
+        messageDiv.className = 'login-message ' + (type || 'error');
+        messageDiv.style.display = 'block';
+      }
+
+      function clearMessage() {
+        messageDiv.style.display = 'none';
+        messageDiv.textContent = '';
+        messageDiv.className = 'login-message';
+      }
+
+      // Si venimos de completar el registro, mostrar aviso
+      const regParams = new URLSearchParams(window.location.search);
+      if (regParams.get('registrado') === '1') {
+        showMessage(t('Usuario registrado. Ya puedes iniciar sesión.'), 'success');
+      }
+
+      emailInput.addEventListener('input', () => {
+        clearMessage();
+        emailInput.classList.remove('error');
+      });
+      passwordInput.addEventListener('input', () => {
+        clearMessage();
+        passwordInput.classList.remove('error');
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!email || !password) {
+          showMessage(t('Por favor, complete todos los campos.'));
+          if (!email) emailInput.classList.add('error');
+          if (!password) passwordInput.classList.add('error');
+          return;
+        }
+
+        // Estado de carga
+        btn.disabled = true;
+        btnText.style.display = 'none';
+        spinner.style.display = 'inline';
+        clearMessage();
+
+        try {
+          const user = await Auth.login(email, password);
+          if (user) {
+            showMessage(t('¡Bienvenido') + ', ' + (user.nombre || email) + '!', 'success');
+            setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+          }
+        } catch (err) {
+          showMessage(err.message || t('Usuario o contraseña incorrectos.'));
+          emailInput.classList.add('error');
+          passwordInput.classList.add('error');
+          passwordInput.value = '';
+        } finally {
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          spinner.style.display = 'none';
+        }
+      });
+
+      // Selector de idioma de la página de login (usa el sistema global si está cargado)
+      function initLoginLanguage() {
+        const savedLang = localStorage.getItem('appLanguage') || 'es';
+        document.querySelectorAll('.flag-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.lang === savedLang);
+          b.addEventListener('click', () => {
+            localStorage.setItem('appLanguage', b.dataset.lang);
+            document.querySelectorAll('.flag-btn').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            if (window.GlobalHeader && window.GlobalHeader.changeLanguage) {
+              window.GlobalHeader.changeLanguage(b.dataset.lang);
+            } else if (window.LoginModal && window.LoginModal.reloadTranslations) {
+              window.LoginModal.reloadTranslations();
+            }
+          });
+        });
+      }
+    });
+  </script>
+
+  <!-- Sistema global (traducciones) si está disponible -->
+  <script src="/static/js/globalHeader.js" data-title="MESA DOCK" data-auto-init="false"></script>
+</body>
+</html>

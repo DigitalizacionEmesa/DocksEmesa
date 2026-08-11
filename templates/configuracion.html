@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MESA DOCK - Configuración</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/breadcrumb.css">
+  <style>
+    .config-head {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .config-head h1 {
+      color: var(--color-primario-oscuro);
+      font-size: 1.6rem;
+      margin: 0;
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      width: 100%;
+      max-width: 980px;
+    }
+
+    .config-card {
+      background: linear-gradient(160deg, #ffffff 0%, #eef6fd 100%);
+      border: 2px solid var(--color-card-border);
+      border-radius: 14px;
+      padding: 18px 16px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 0 2px 8px rgba(41, 128, 199, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+      font-family: var(--font-main);
+      color: var(--color-texto);
+    }
+
+    .config-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--color-primario);
+      box-shadow: 0 8px 24px rgba(41, 128, 199, 0.2);
+    }
+
+    .config-card .cc-icon {
+      font-size: 2rem;
+    }
+
+    .config-card .cc-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--color-card-text);
+    }
+
+    .config-card .cc-desc {
+      font-size: 0.82rem;
+      color: #666;
+      line-height: 1.35;
+      flex: 1;
+    }
+
+    .config-card .cc-arrow {
+      font-size: 1.1rem;
+      color: var(--color-primario);
+      opacity: 0.6;
+      align-self: flex-end;
+    }
+
+    .config-section-title {
+      width: 100%;
+      max-width: 980px;
+      text-align: left;
+      color: var(--color-primario-oscuro);
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 26px 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .config-section-title::after {
+      content: '';
+      flex: 1;
+      height: 2px;
+      background: linear-gradient(90deg, var(--color-card-border), transparent);
+    }
+
+    /* ================= RESPONSIVE CONFIGURACION (movil/tablet) ================= */
+    @media (max-width: 1024px) {
+      .config-head h1 { font-size: 1.4rem; }
+      .config-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+      .config-card { padding: 14px 12px; }
+      .config-card .cc-icon { font-size: 1.7rem; }
+      .config-card .cc-title { font-size: 1rem; }
+      .config-card .cc-desc { font-size: 0.78rem; }
+      .config-section-title { font-size: 1.05rem; margin: 20px 0 10px 0; }
+    }
+
+    @media (max-width: 700px) {
+      .config-head { flex-direction: column; align-items: stretch; gap: 10px; }
+      .config-head h1 { font-size: 1.2rem; }
+      .config-grid { grid-template-columns: 1fr; gap: 10px; }
+      .config-card { padding: 14px 14px; }
+      .config-card .cc-icon { font-size: 1.6rem; }
+      .config-card .cc-title { font-size: 1.02rem; }
+      .config-card .cc-desc { font-size: 0.78rem; }
+      .config-section-title { font-size: 1rem; margin: 18px 0 8px 0; }
+      .footer-info { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header"></div>
+  <script src="/static/js/globalHeader.js" data-title="Configuración"></script>
+
+  <!-- Breadcrumb EMESA (jerarquía Inicio > Configuración > Submenú) -->
+  <nav class="breadcrumb-wrapper" aria-label="Breadcrumb">
+    <div class="breadcrumb-container" id="breadcrumb"></div>
+  </nav>
+
+  <div class="main-container">
+    <div class="config-head">
+      <h1 data-original-text="Configuración del sistema">⚙️ Configuración del sistema</h1>
+    </div>
+
+    <!-- Secciones renderizadas por configuracion.js -->
+    <div id="secciones"></div>
+
+    <div class="footer-info">
+      <p data-original-text="MESA DOCK · Módulos de configuración">MESA DOCK · Módulos de configuración</p>
+      <p data-original-text="Datos gestionados en Supabase">Datos gestionados en Supabase</p>
+    </div>
+  </div>
+
+  <script src="/static/js/navegacion.js"></script>
+  <script src="/static/js/supabase.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/permisos.js"></script>
+  <script src="/static/js/modulos.js"></script>
+  <script src="/static/js/configuracion.js"></script>
+  <script src="/static/js/breadcrumb.js"></script>
+</body>
+</html>

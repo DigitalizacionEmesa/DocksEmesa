@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MESA DOCK - Calendario</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/breadcrumb.css">
+  <style>
+    .cal-head {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .cal-head h1 { color: var(--color-primario-oscuro); font-size: 1.6rem; margin: 0; }
+
+    .cal-toolbar {
+      width: 100%; max-width: 1200px; display: flex; gap: 12px; flex-wrap: wrap;
+      align-items: center; background: linear-gradient(160deg, #ffffff 0%, #eef6fd 100%);
+      border: 2px solid var(--color-card-border); border-radius: 14px; padding: 12px 16px;
+      margin-bottom: 14px; box-shadow: 0 2px 8px rgba(41, 128, 199, 0.08);
+    }
+    .cal-toolbar label { font-weight: 700; color: var(--color-primario-oscuro); font-size: 0.9rem; margin-right: 4px; }
+    .cal-toolbar select { min-width: 200px; flex: 1; }
+
+    /* Toggle de vista */
+    .view-toggle {
+      display: inline-flex; border: 2px solid var(--color-card-border); border-radius: 10px;
+      overflow: hidden; background: #fff;
+    }
+    .view-toggle button {
+      border: none; background: transparent; padding: 8px 18px; font-size: 0.9rem;
+      font-weight: 700; color: #555; cursor: pointer; font-family: var(--font-main);
+    }
+    .view-toggle button.activo { background: var(--color-primario); color: #fff; }
+
+    /* Navegacion semanal */
+    .semana-nav {
+      width: 100%; max-width: 1200px; display: flex; align-items: center;
+      justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .semana-nav .semana-titulo { font-weight: 700; color: var(--color-primario-oscuro); font-size: 1.05rem; }
+    .semana-nav .btn { margin: 0; }
+    .semana-nav .fecha-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .semana-nav .fecha-nav.bloqueada {
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+    .semana-nav .fecha-nav .btn-nav:disabled {
+      background: #8db4dd;   /* azul un poco más suave al bloquear */
+      color: #fff;
+      filter: none;
+      cursor: not-allowed;
+    }
+    .semana-nav .fecha-nav.bloqueada .fecha-input-wrap input[type="text"] {
+      background: #eceff1;
+      color: #9aa5b1;
+    }
+    .semana-nav .fecha-nav .btn-nav {
+      background: var(--color-primario);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      width: 40px;
+      height: 42px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      box-shadow: 0 1px 4px rgba(56, 128, 199, 0.2);
+      transition: background 0.15s ease, transform 0.1s ease;
+      flex-shrink: 0;
+    }
+    .semana-nav .fecha-nav .btn-nav:hover { background: var(--color-boton-hover); }
+    .semana-nav .fecha-nav .btn-nav:active { transform: scale(0.94); }
+    .semana-nav .fecha-nav .fecha-input-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+    .semana-nav .fecha-nav .fecha-input-wrap input[type="text"] {
+      min-width: 132px;
+      margin: 0;
+      text-align: center;
+      cursor: pointer;
+      background: #fff;
+      font-weight: 600;
+      color: var(--color-primario-oscuro);
+      letter-spacing: 0.3px;
+    }
+    .semana-nav .fecha-nav .fecha-input-wrap input[type="date"] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      border: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Leyenda */
+    .leyenda { width: 100%; max-width: 1200px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; font-size: 0.85rem; color: #555; }
+    .leyenda .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; margin-right: 5px; vertical-align: middle; }
+
+    /* ---- Vista visual (grid) ---- */
+    .calendario-wrap { width: 100%; max-width: 1200px; overflow-x: auto; background: #fff; border: 2px solid var(--color-card-border); border-radius: 14px; box-shadow: 0 2px 8px rgba(41, 128, 199, 0.08); }
+    .dia-pasado-aviso {
+      width: 100%; max-width: 1200px; box-sizing: border-box;
+      color: #5f6b76; background: #eceff1; border: 1px dashed #9aa5b1;
+      border-radius: 10px; padding: 9px 14px; margin-bottom: 10px;
+      font-size: 0.9rem; font-weight: 600; text-align: center;
+    }
+    .calendario-wrap.dia-pasado td.libre {
+      background: repeating-linear-gradient(45deg, #f1f3f5, #f1f3f5 4px, #e6e9ed 4px, #e6e9ed 8px) !important;
+      cursor: not-allowed !important;
+      color: transparent;
+    }
+    .calendario-wrap.dia-pasado td.libre::after {
+      content: '\2014';
+      color: #aab2bd;
+      font-size: 0.65rem;
+    }
+    .calendario-wrap.dia-pasado td.libre:hover {
+      background: repeating-linear-gradient(45deg, #f1f3f5, #f1f3f5 4px, #e6e9ed 4px, #e6e9ed 8px) !important;
+      box-shadow: none !important;
+    }
+    #calGrid { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 760px; }
+    #calGrid th, #calGrid td { border: 1px solid #e3e8ee; padding: 0; text-align: center; font-size: 0.72rem; vertical-align: middle; }
+    #calGrid th.hora-col { width: 56px; background: #f4f7fa; color: #555; font-weight: 700; padding: 6px; position: sticky; left: 0; z-index: 2; }
+    #calGrid th.muelle-col { background: linear-gradient(160deg, #eef6fd 0%, #dcecf9 100%); color: var(--color-primario-oscuro); font-weight: 700; padding: 8px 4px; line-height: 1.3; font-size: 0.85rem; white-space: nowrap; }
+    #calGrid th.muelle-col .sub { display: block; font-size: 0.72rem; font-weight: 600; color: #5b7893; }
+    #calGrid th.dia-col { background: #f0f5fa; color: #3a6b8f; font-weight: 600; padding: 4px 2px; font-size: 0.68rem; }
+    #calGrid th.dia-col.hoy { background: linear-gradient(160deg, #ffe0b2 0%, #ffcc80 100%); color: #7a4a00; }
+    #calGrid td.hora { background: #fafbfc; color: #666; font-weight: 600; padding: 3px; position: sticky; left: 0; z-index: 1; background: #f4f7fa; }
+    #calGrid td.celda { height: 32px; min-width: 64px; }
+    #calGrid td.libre { background: #e8f5e9; }
+    #calGrid td.cerrado {
+      background: repeating-linear-gradient(45deg, #f1f3f5, #f1f3f5 4px, #e6e9ed 4px, #e6e9ed 8px);
+      color: #aab2bd;
+      font-size: 0.65rem;
+    }
+    .chip-reserva {
+      display: block; padding: 3px 4px; font-size: 0.66rem; font-weight: 700;
+      line-height: 1.25; border-radius: 5px; margin: 2px; color: #fff;
+      border: 1px solid rgba(0,0,0,0.15);
+    }
+    .chip-carga, .chip-descarga { background: #1976d2; }
+    .chip-reserva .hora-txt { display: block; font-size: 0.6rem; font-weight: 600; opacity: 0.9; }
+
+    /* ---- Vista listado (tarjetas) ---- */
+    .listado-wrap { width: 100%; max-width: 1200px; background: #fff; border: 2px solid var(--color-card-border); border-radius: 14px; box-shadow: 0 2px 8px rgba(41, 128, 199, 0.08); padding: 16px 20px; }
+    .dia-titulo {
+      font-weight: 700; color: var(--color-primario-oscuro); font-size: 1.05rem;
+      margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #eef1f5;
+    }
+    .dia-titulo:first-child { margin-top: 0; }
+    .reserva-card {
+      border: 1.5px solid #0d47a1; border-radius: 12px; padding: 12px 16px;
+      margin-bottom: 10px; background: #1976d2; color: #fff;
+      box-shadow: 0 2px 6px rgba(13, 71, 161, 0.25);
+    }
+    .reserva-card.cancelada { opacity: 0.6; }
+    .rc-titulo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+    .rc-titulo strong { font-size: 0.95rem; color: #fff; }
+    .rc-titulo .rc-ruta { font-size: 0.8rem; color: #cfe3f5; }
+    .rc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; }
+    .rc-campo { display: flex; flex-direction: column; }
+    .rc-campo.full { grid-column: 1 / -1; }
+    .rc-label { font-size: 0.72rem; font-weight: 700; color: #cfe3f5; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+    .rc-valor { font-size: 0.92rem; font-weight: 600; color: #fff; }
+
+    .empty-state { text-align: center; color: #888; padding: 30px; font-size: 0.95rem; }
+    .oculto { display: none; }
+
+    /* Modal Informe */
+    .crud-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(2px); z-index: 10000; display: flex;
+      align-items: center; justify-content: center;
+      opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s ease;
+      padding: 20px;
+    }
+    .crud-modal-overlay.active { opacity: 1; visibility: visible; }
+    .crud-modal {
+      background: #fff; border-radius: 16px; width: 100%; max-width: 520px;
+      max-height: 90vh; overflow-y: auto; box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+      transform: translateY(20px) scale(0.98); transition: transform 0.25s ease;
+    }
+    .crud-modal-overlay.active .crud-modal { transform: translateY(0) scale(1); }
+    .crud-modal-head {
+      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+      color: #fff; padding: 18px 22px; border-radius: 16px 16px 0 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .crud-modal-head h3 { margin: 0; font-size: 1.2rem; }
+    .crud-modal-close {
+      background: rgba(255, 255, 255, 0.2); border: none; color: #fff;
+      width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; line-height: 1;
+    }
+    .crud-modal-body { padding: 22px; }
+    .crud-modal-foot { padding: 0 22px 22px 22px; display: flex; justify-content: flex-end; }
+
+    .informe-seccion {
+      border: 1.5px solid #e3e8ee; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+    }
+    .informe-seccion h4 { margin: 0 0 10px 0; font-size: 0.95rem; color: var(--color-primario-oscuro); display: flex; align-items: center; gap: 8px; }
+    .informe-fila { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #eef1f5; font-size: 0.88rem; }
+    .informe-fila:last-child { border-bottom: none; }
+    .informe-fila .k { color: #666; font-weight: 600; }
+    .informe-fila .v { text-align: right; font-weight: 500; color: #222; }
+    .informe-vacio { color: #888; font-size: 0.9rem; padding: 10px 0; }
+
+    /* ================= RESPONSIVE MOVIL / TABLET ================= */
+
+    /* Tablets */
+    @media (max-width: 1024px) and (min-width: 701px) {
+      .cal-toolbar select { min-width: 150px; }
+      #calGrid td.celda { height: 38px; }
+      #calGrid th.muelle-col { font-size: 0.8rem; }
+    }
+
+    /* Movil */
+    @media (max-width: 700px) {
+      .main-container { padding: 0 0 24px; }
+      .cal-head, .cal-toolbar, .semana-nav, .leyenda, .calendario-wrap, .listado-wrap {
+        width: 100%; border-radius: 0; border-left: none; border-right: none;
+      }
+
+      /* Barra superior fija (titulo) */
+      .cal-head {
+        position: sticky; top: 0; z-index: 55;
+        background: #fff; margin: 0; padding: 12px 16px;
+        border-bottom: 1px solid #eef1f5; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        justify-content: space-between;
+      }
+      .cal-head h1 { font-size: 1.15rem; }
+
+      /* Toolbar de filtros apilado */
+      .cal-toolbar {
+        flex-direction: column; align-items: stretch; gap: 6px;
+        padding: 12px 14px; margin-bottom: 10px;
+      }
+      .cal-toolbar > div { display: flex; align-items: center; gap: 10px; }
+      .cal-toolbar label { min-width: 64px; font-size: 0.85rem; }
+      .cal-toolbar select { flex: 1; min-width: 0; min-height: 44px; font-size: 0.95rem; }
+
+      /* Toggle segmentado a ancho completo */
+      .view-toggle { width: 100%; border-radius: 12px; }
+      .view-toggle button { flex: 1; padding: 11px 10px; font-size: 0.95rem; }
+
+      /* Fecha */
+      .semana-nav { margin-bottom: 10px; }
+      .semana-nav .semana-titulo { font-size: 1rem; }
+      .semana-nav .fecha-nav { flex: 1; min-width: 0; }
+      .semana-nav .fecha-nav .btn-nav { width: 46px; height: 44px; font-size: 1.15rem; }
+      .semana-nav .fecha-nav .fecha-input-wrap { flex: 1; min-width: 0; }
+      .semana-nav .fecha-nav .fecha-input-wrap input[type="text"] { width: 100%; min-width: 0; min-height: 44px; font-size: 0.95rem; }
+      .semana-nav .btn { min-height: 44px; padding: 0 18px; }
+
+      /* Leyenda */
+      .leyenda { gap: 8px 16px; font-size: 0.78rem; padding: 0 4px; }
+
+      /* Grid: celdas altas para tocar */
+      .calendario-wrap { -webkit-overflow-scrolling: touch; }
+      #calGrid { min-width: 480px; }
+      #calGrid th.hora-col { width: 46px; }
+      #calGrid td.celda { height: 44px; min-width: 62px; }
+      #calGrid th.muelle-col { font-size: 0.8rem; padding: 10px 6px; }
+      .chip-reserva { font-size: 0.72rem; padding: 4px 6px; }
+      .chip-reserva .hora-txt { font-size: 0.66rem; }
+
+      /* Listado -> tarjetas */
+      .listado-wrap { padding: 10px; }
+
+      /* Modales como hojas inferiores */
+      .crud-modal-overlay { padding: 0; align-items: flex-end; }
+      .crud-modal {
+        width: 100%; max-width: 100%; max-height: 92vh; border-radius: 22px 22px 0 0;
+        transform: translateY(100%);
+      }
+      .crud-modal-overlay.active .crud-modal { transform: translateY(0); }
+      .crud-modal::before {
+        content: ''; display: block; width: 42px; height: 5px; border-radius: 3px;
+        background: #d7dfe8; margin: 10px auto 0;
+      }
+      .crud-modal-head { border-radius: 22px 22px 0 0; padding: 14px 18px; }
+      .crud-modal-body { padding: 16px 18px; }
+      .crud-modal-foot { padding: 0 18px calc(16px + env(safe-area-inset-bottom, 0px)); }
+
+      .footer-info { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header"></div>
+  <script src="/static/js/globalHeader.js" data-title="Calendario"></script>
+
+  <nav class="breadcrumb-wrapper" aria-label="Breadcrumb">
+    <div class="breadcrumb-container" id="breadcrumb"></div>
+  </nav>
+
+  <div class="main-container">
+    <div class="cal-head">
+      <h1>🗓️ Calendario de reservas</h1>
+    </div>
+
+    <div class="cal-toolbar">
+      <div>
+        <label for="filtroPlanta" data-original-text="Planta">Planta</label>
+        <select id="filtroPlanta"></select>
+      </div>
+      <div>
+        <label for="filtroNave" data-original-text="Nave">Nave</label>
+        <select id="filtroNave" disabled></select>
+      </div>
+      <div>
+        <label for="filtroMuelle" data-original-text="Muelle">Muelle</label>
+        <select id="filtroMuelle" disabled></select>
+      </div>
+      <div style="margin-left:auto;">
+        <div class="view-toggle">
+          <button id="btnVistaVisual" class="activo" data-original-text="Visual">Visual</button>
+          <button id="btnVistaLista" data-original-text="Listado">Listado</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="semana-nav">
+      <span class="semana-titulo" id="fechaTitulo">—</span>
+      <div class="fecha-nav">
+        <label for="fechaSel" data-original-text="Fecha">Fecha</label>
+        <button type="button" class="btn-nav" id="btnPrevDia" title="Día anterior" aria-label="Día anterior">◀</button>
+        <div class="fecha-input-wrap">
+          <input type="text" id="fechaSelTxt" readonly value="—" aria-label="Fecha seleccionada" title="Clic para elegir día">
+          <input type="date" id="fechaSel" tabindex="-1" aria-hidden="true">
+        </div>
+        <button type="button" class="btn-nav" id="btnNextDia" title="Día siguiente" aria-label="Día siguiente">▶</button>
+        <button class="btn" id="btnHoy" data-original-text="Hoy">Hoy</button>
+      </div>
+    </div>
+
+    <div class="leyenda">
+      <span><span class="swatch" style="background:#e8f5e9;border:1px solid #66bb6a;"></span>Disponible</span>
+      <span><span class="swatch" style="background:#1976d2;"></span>Descarga</span>
+      <span><span class="swatch" style="background:#ef6c00;"></span>Carga</span>
+      <span><span class="swatch" style="background:#f1f3f5;"></span>Cerrado</span>
+    </div>
+
+    <!-- Aviso día pasado -->
+    <div class="dia-pasado-aviso oculto" id="avisoDiaPasado" data-original-text="Día pasado · Solo lectura">Día pasado · Solo lectura</div>
+
+    <!-- Vista visual -->
+    <div class="calendario-wrap" id="vistaVisual">
+      <table id="calGrid">
+        <thead id="calGridHead"></thead>
+        <tbody id="calGridBody">
+          <tr><td colspan="8" class="empty-state" id="calGridLoading">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Vista listado -->
+    <div class="listado-wrap oculto" id="vistaLista">
+      <div id="listaCards" class="empty-state">Cargando...</div>
+    </div>
+
+    <div class="footer-info">
+      <p data-original-text="MESA DOCK · Calendario de reservas (solo lectura)">MESA DOCK · Calendario de reservas (solo lectura)</p>
+      <p data-original-text="Vista diaria por planta">Vista diaria por planta</p>
+    </div>
+  </div>
+
+  <!-- Modal Informe (doble clic en una reserva) -->
+  <div class="crud-modal-overlay" id="informeModal">
+    <div class="crud-modal">
+      <div class="crud-modal-head">
+        <h3>📋 Informe de reserva</h3>
+        <button class="crud-modal-close" id="informeClose" title="Cerrar">✕</button>
+      </div>
+      <div class="crud-modal-body">
+        <div id="informeReserva"></div>
+        <div id="informeUsuario"></div>
+      </div>
+      <div class="crud-modal-foot">
+        <button type="button" class="btn" id="informeCancelar" data-original-text="Cerrar">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/navegacion.js"></script>
+  <script src="/static/js/supabase.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/permisos.js"></script>
+  <script src="/static/js/calendario.js"></script>
+  <script src="/static/js/breadcrumb.js"></script>
+</body>
+</html>

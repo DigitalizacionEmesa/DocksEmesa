@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MESA DOCK - Excepciones de horario</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/breadcrumb.css">
+  <style>
+    .modulo-head {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .modulo-head h1 { color: var(--color-primario-oscuro); font-size: 1.5rem; margin: 0; }
+
+    .modulo-toolbar {
+      width: 100%; max-width: 980px;
+      background: linear-gradient(135deg, #f7fbff 0%, #eef5fc 100%);
+      border: 1px solid #d6e6f4; border-radius: 12px; padding: 12px 14px;
+      box-shadow: 0 2px 10px rgba(25, 118, 210, 0.07);
+      display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;
+    }
+    .toolbar-acciones { display: flex; justify-content: flex-end; align-items: center; }
+    .modulo-toolbar .btn { margin: 0; }
+    .modulo-toolbar .btn:hover {
+      transform: translateY(-1px); box-shadow: 0 4px 12px rgba(40, 167, 69, 0.35);
+    }
+    .modulo-toolbar .btn-exito { box-shadow: 0 2px 8px rgba(40, 167, 69, 0.28); }
+    .modulo-filtros { width: 100%; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .buscador-wrap { position: relative; flex: 0 1 300px; min-width: 190px; }
+    .buscador-icono {
+      position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+      font-size: 0.9rem; opacity: 0.65; pointer-events: none;
+    }
+    .buscador-wrap input[type="search"] {
+      width: 100%; padding-left: 34px; border-radius: 20px; margin: 0;
+      background: #fff; border-color: #d4e2f0;
+    }
+    .buscador-wrap input[type="search"]:focus {
+      border-color: var(--color-primario); box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.14);
+    }
+
+    /* Filtros: rango de fechas y por nave (píldoras) */
+    .filtro-fechas, .filtro-nave {
+      display: flex; align-items: center; gap: 6px;
+      background: #fff; border: 1.5px solid #d4e2f0; border-radius: 20px;
+      padding: 4px 10px; flex: 0 1 auto;
+    }
+    .filtro-fechas .filtro-icono, .filtro-nave .filtro-icono {
+      opacity: 0.7; font-size: 0.9rem; line-height: 1;
+    }
+    .filtro-fechas input[type="date"] {
+      border: none; background: transparent; width: auto; margin: 0;
+      padding: 0.3rem 0.1rem; font-size: 0.9rem;
+    }
+    .filtro-fechas .filtro-sep { color: #8aa2bd; font-weight: 600; }
+    .filtro-nave select {
+      border: none; background: transparent; width: auto; margin: 0;
+      padding: 0.3rem 0.4rem; font-size: 0.9rem; min-width: 150px;
+    }
+
+    .modulo-aviso {
+      width: 100%; max-width: 980px; margin-bottom: 12px; padding: 10px 16px;
+      border-radius: 8px; font-size: 0.9rem; font-weight: 600; box-sizing: border-box;
+    }
+    .modulo-aviso.info { background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+    .modulo-aviso.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+
+    .modulo-panel { width: 100%; max-width: 980px; padding: 20px; overflow-x: auto; }
+    .modulo-panel table { margin-top: 0; }
+
+    .acciones-cell { white-space: nowrap; text-align: center; }
+    .action-button {
+      font-size: 0.85em; font-weight: 600; color: white; border: none;
+      border-radius: 6px; padding: 5px 10px; cursor: pointer; margin: 2px;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .action-button:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-edit { background: var(--color-primario); }
+    .btn-del { background: var(--color-error); }
+
+    /* Badge de motivo */
+    .badge-motivo { display: inline-block; border-radius: 12px; padding: 3px 10px; font-size: 0.8rem; font-weight: 700; }
+    .badge-motivo.mantenimiento { background: #fff3cd; color: #856404; }
+    .badge-motivo.cierre { background: #f8d7da; color: #721c24; }
+    .badge-motivo.otro { background: #e2e3e5; color: #383d41; }
+
+    /* Modal CRUD */
+    .crud-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(2px); z-index: 10000; display: flex;
+      align-items: center; justify-content: center;
+      opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s ease;
+      padding: 20px;
+    }
+    .crud-modal-overlay.active { opacity: 1; visibility: visible; }
+    .crud-modal {
+      background: #fff; border-radius: 16px; width: 100%; max-width: 560px;
+      max-height: 92vh; overflow-y: auto; box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+      transform: translateY(20px) scale(0.98); transition: transform 0.25s ease;
+    }
+    .crud-modal-overlay.active .crud-modal { transform: translateY(0) scale(1); }
+    .crud-modal-head {
+      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+      color: #fff; padding: 18px 22px; border-radius: 16px 16px 0 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .crud-modal-head h3 { margin: 0; font-size: 1.2rem; }
+    .crud-modal-close {
+      background: rgba(255, 255, 255, 0.2); border: none; color: #fff;
+      width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; line-height: 1;
+    }
+    .crud-modal-body { padding: 22px; }
+    .crud-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+    .crud-form-grid .full { grid-column: 1 / -1; }
+    .crud-form-grid label { display: block; margin-bottom: 4px; font-weight: 600; color: #333; font-size: 0.9rem; }
+    .crud-form-grid input, .crud-form-grid select { margin-bottom: 12px; }
+    .crud-form-grid input[type="checkbox"] { width: auto; margin: 6px 0 12px 0; transform: scale(1.3); cursor: pointer; }
+    .crud-modal-foot { padding: 0 22px 22px 22px; display: flex; justify-content: flex-end; gap: 12px; }
+    @media (max-width: 600px) { .crud-form-grid { grid-template-columns: 1fr; } }
+
+    /* Responsive movil */
+    @media (max-width: 700px) {
+      .main-container { padding: 0 0 24px; }
+      .modulo-head, .modulo-toolbar, .modulo-aviso, .modulo-panel {
+        width: 100%; border-radius: 0; border-left: none; border-right: none;
+      }
+      .modulo-head {
+        position: sticky; top: 0; z-index: 55; background: #fff; margin: 0;
+        padding: 12px 16px; border-bottom: 1px solid #eef1f5;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); justify-content: space-between;
+      }
+      .modulo-head h1 { font-size: 1.15rem; }
+      .modulo-toolbar { padding: 12px 14px; }
+      .modulo-toolbar input[type="search"] { min-height: 44px; }
+      .modulo-toolbar .btn { min-height: 44px; }
+      .modulo-panel { padding: 10px; }
+      .crud-modal-overlay { padding: 0; align-items: flex-end; }
+      .crud-modal {
+        width: 100%; max-width: 100%; max-height: 92vh; border-radius: 22px 22px 0 0;
+        transform: translateY(100%);
+      }
+      .crud-modal-overlay.active .crud-modal { transform: translateY(0); }
+      .crud-modal::before {
+        content: ''; display: block; width: 42px; height: 5px; border-radius: 3px;
+        background: #d7dfe8; margin: 10px auto 0;
+      }
+      .crud-modal-head { border-radius: 22px 22px 0 0; padding: 14px 18px; }
+      .crud-modal-body { padding: 16px 18px; }
+      .crud-modal-foot { padding: 0 18px calc(16px + env(safe-area-inset-bottom, 0px)); }
+      .footer-info { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header"></div>
+  <script src="/static/js/globalHeader.js" data-title="Excepciones"></script>
+
+  <nav class="breadcrumb-wrapper" aria-label="Breadcrumb">
+    <div class="breadcrumb-container" id="breadcrumb"></div>
+  </nav>
+
+  <div class="main-container">
+    <div class="modulo-head">
+      <h1>🛠️ Excepciones de horario</h1>
+    </div>
+
+    <div class="modulo-toolbar">
+      <div class="toolbar-acciones">
+        <button class="btn btn-exito" id="btnNuevo" data-original-text="Nueva excepcion">＋ Nueva excepcion</button>
+      </div>
+      <div class="modulo-filtros">
+        <div class="buscador-wrap">
+          <span class="buscador-icono">🔍</span>
+          <input type="search" id="busqueda" placeholder="Buscar..." data-original-placeholder="Buscar...">
+        </div>
+        <div class="filtro-fechas" title="Filtrar por rango de fechas" data-original-title="Filtrar por rango de fechas">
+          <span class="filtro-icono">📅</span>
+          <input type="date" id="filtroDesde" title="Desde" data-original-title="Desde">
+          <span class="filtro-sep">–</span>
+          <input type="date" id="filtroHasta" title="Hasta" data-original-title="Hasta">
+        </div>
+        <div class="filtro-nave" title="Filtrar por nave" data-original-title="Filtrar por nave">
+          <span class="filtro-icono">🏗️</span>
+          <select id="filtroNave"></select>
+        </div>
+      </div>
+    </div>
+
+    <div id="moduloAviso" class="modulo-aviso" style="display:none;"></div>
+
+    <div class="panel modulo-panel">
+      <table>
+        <thead id="moduloThead"></thead>
+        <tbody id="moduloTbody">
+          <tr><td colspan="8" class="empty-state">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer-info">
+      <p data-original-text="MESA DOCK · Excepciones de horario">MESA DOCK · Excepciones de horario</p>
+      <p data-original-text="Marca dias/horas en los que el muelle estara cerrado (mantenimiento, cierre...)">Marca dias/horas en los que el muelle estara cerrado (mantenimiento, cierre...)</p>
+    </div>
+  </div>
+
+  <!-- Modal crear/editar excepcion -->
+  <div class="crud-modal-overlay" id="crudModal">
+    <div class="crud-modal">
+      <div class="crud-modal-head">
+        <h3 id="crudModalTitulo">Nueva excepcion</h3>
+        <button class="crud-modal-close" id="crudModalClose" title="Cerrar">✕</button>
+      </div>
+      <div class="crud-modal-body">
+        <form id="crudForm" class="crud-form-grid">
+          <div class="crud-field">
+            <label data-original-text="Planta">Planta</label>
+            <select id="f_planta_id"></select>
+          </div>
+          <div class="crud-field">
+            <label data-original-text="Nave">Nave</label>
+            <select id="f_nave_id" disabled></select>
+          </div>
+          <div class="crud-field full">
+            <label data-original-text="Muelle">Muelle</label>
+            <select id="f_muelle_id" disabled required></select>
+          </div>
+          <div class="crud-field">
+            <label data-original-text="Fecha">Fecha</label>
+            <input type="date" id="f_fecha" required>
+          </div>
+          <div class="crud-field">
+            <label data-original-text="Motivo">Motivo</label>
+            <select id="f_motivo">
+              <option value="mantenimiento">Mantenimiento</option>
+              <option value="cierre">Cierre</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="crud-field">
+            <label data-original-text="Hora inicio">Hora inicio</label>
+            <input type="time" id="f_hora_inicio" required>
+          </div>
+          <div class="crud-field">
+            <label data-original-text="Hora fin">Hora fin</label>
+            <input type="time" id="f_hora_fin" required>
+          </div>
+          <div class="crud-field full">
+            <label data-original-text="Activo">Activo</label>
+            <input type="checkbox" id="f_activo" checked>
+          </div>
+          <input type="hidden" id="f_id">
+        </form>
+      </div>
+      <div class="crud-modal-foot">
+        <button type="button" class="btn" id="crudCancelar" data-original-text="Cancelar">Cancelar</button>
+        <button type="submit" form="crudForm" class="btn btn-exito" id="crudGuardar" data-original-text="Guardar">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/navegacion.js"></script>
+  <script src="/static/js/supabase.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/permisos.js"></script>
+  <script src="/static/js/excepciones.js"></script>
+  <script src="/static/js/breadcrumb.js"></script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MESA DOCK - Vista Muelles</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/breadcrumb.css">
+  <style>
+    .modulo-head {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .modulo-head h1 { color: var(--color-primario-oscuro); font-size: 1.5rem; margin: 0; }
+
+    .plantas-grid {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    /* ---- Tarjeta de planta (formato vertical / carta de pie) ---- */
+    .planta-card {
+      flex: 1 1 420px;
+      min-width: 320px;
+      background: #fff;
+      border: 1px solid #d6e6f4;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(25, 118, 210, 0.07);
+    }
+    .planta-head {
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .planta-icono { font-size: 1.3rem; }
+    .planta-head h2 { margin: 0; font-size: 1.15rem; flex: 1; }
+    .planta-badge {
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* ---- Naves apiladas verticalmente dentro de cada planta ---- */
+    .nave-grid {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      background: transparent;
+    }
+
+    /* ---- Nave (edificio) ---- */
+    .nave-block {
+      background: #fff;
+      border: 1.5px solid #d7e4f1;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .nave-roof {
+      color: #fff;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+    }
+    .nave-roof .nave-icono { font-size: 1rem; }
+    .nave-roof .nave-nombre { flex: 1; }
+    .nave-roof .nave-count {
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 12px;
+      padding: 1px 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* ---- Muelles (puertas, con acento de color) ---- */
+    .muelle-slots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px;
+    }
+    .muelle-slot {
+      flex: 1 1 84px;
+      max-width: 100px;
+      border: 1.5px solid #e0e9f3;
+      border-top-width: 3px;
+      border-radius: 10px;
+      background: #f4f8fc;
+      padding: 8px 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .muelle-slot:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 3px 8px rgba(25, 118, 210, 0.18);
+    }
+    .muelle-icono { font-size: 1.1rem; }
+    .muelle-nombre {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #31465c;
+    }
+
+    .plano-cargando, .plano-vacio {
+      width: 100%;
+      padding: 40px;
+      text-align: center;
+      color: #5b7893;
+      font-weight: 600;
+    }
+
+    .footer-info { text-align: center; color: #5b7893; margin-top: 18px; font-size: 0.85rem; }
+
+    /* Responsive movil */
+    @media (max-width: 700px) {
+      .main-container { padding: 0 0 24px; }
+      .plantas-grid { gap: 12px; }
+      .planta-card { min-width: 100%; }
+      .nave-grid { padding: 10px; }
+      .muelle-slot { flex: 1 1 28%; max-width: none; }
+      .footer-info { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header"></div>
+  <script src="/static/js/globalHeader.js" data-title="Vista Muelles"></script>
+
+  <nav class="breadcrumb-wrapper" aria-label="Breadcrumb">
+    <div class="breadcrumb-container" id="breadcrumb"></div>
+  </nav>
+
+  <div class="main-container">
+    <div class="modulo-head">
+      <h1 data-original-text="Vista Muelles">🗺️ Vista Muelles</h1>
+    </div>
+
+    <div id="planoPlantas" class="plantas-grid">
+      <div class="plano-cargando" data-original-text="Cargando...">Cargando...</div>
+    </div>
+
+    <div class="footer-info">
+      <p data-original-text="MESA DOCK · Vista Muelles">MESA DOCK · Vista Muelles</p>
+    </div>
+  </div>
+
+  <script src="/static/js/navegacion.js"></script>
+  <script src="/static/js/supabase.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/permisos.js"></script>
+  <script src="/static/js/modulos.js"></script>
+  <script src="/static/js/vista_muelles.js"></script>
+  <script src="/static/js/breadcrumb.js"></script>
+</body>
+</html>
