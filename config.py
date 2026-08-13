@@ -1,3 +1,8 @@
-SUPABASE_URL = "https://oxmrtpegdxbohtgoywyw.supabase.co"
+import os
 
-SUPABASE_KEY = "sb_secret_pjkdbdq_GeebEcCPBkfVRg_WmBJvUhM"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
