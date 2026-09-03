@@ -1,5 +1,5 @@
 // =====================================================================
-// vista_muelles.js - Plano visual de muelles MESA DOCK
+// vista_muelles.js - Plano visual de muelles EMESA DOCK
 // =====================================================================
 // Muestra la jerarquia Planta > Nave > Muelle como un plano: cada planta
 // es una tarjeta, dentro sus naves como edificios y dentro de cada nave
@@ -21,7 +21,7 @@
   // Colores de planta: cabecera SÓLIDA (sin degradado) + fondo de tarjeta tintado
   var PLANTAS_COLOR = [
     { head: '#1976d2', fondo: '#e7f0fa' },   // EMESA: azul sólido
-    { head: '#d71920', fondo: '#fdecea' },   // Ostrava: rojo MESA sólido
+    { head: '#d71920', fondo: '#fdecea' },   // Ostrava: rojo EMESA sólido
     { head: '#00695c', fondo: '#e0f2f1' }    // reserva: teal
   ];
   var COLORES_NAVE = ['#1565c0', '#00838f', '#2e7d32', '#ef6c00', '#6a1b9a'];

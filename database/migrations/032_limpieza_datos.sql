@@ -1,5 +1,5 @@
 -- ==========================================================================
--- 032_limpieza_datos.sql — LIMPIEZA Y REINICIO DE DATOS MESA DOCK (SCCZ)
+-- 032_limpieza_datos.sql — LIMPIEZA Y REINICIO DE DATOS EMESA DOCK (SCCZ)
 -- ==========================================================================
 -- EJECUTAR EN EL SQL EDITOR DE SUPABASE.
 --

@@ -1,5 +1,5 @@
 // =====================================================================
-// registro.js - Registro de usuario MESA DOCK
+// registro.js - Registro de usuario EMESA DOCK
 // =====================================================================
 // Pantalla publica para que un usuario se registre por primera vez.
 // Reutiliza los mismos campos del formulario de creacion de usuario de

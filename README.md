@@ -1,8 +1,8 @@
-# 🚛 MESA DOCK — Gestión de Muelles y Reservas
+# 🚛 EMESA DOCK — Gestión de Muelles y Reservas
 
 Aplicación web para la gestión de muelles de carga/descarga y sus reservas,
 desarrollada sobre **Flask + Supabase** y con el **estilo visual de la
-plantilla DIGITALIZATION SCCZ** (header global con logo MESA, selector de
+plantilla DIGITALIZATION SCCZ** (header global con logo EMESA, selector de
 idioma ES/EN/CZ, modal de login universal, tarjetas y tablas corporativas).
 
 ---
@@ -14,7 +14,7 @@ idioma ES/EN/CZ, modal de login universal, tarjetas y tablas corporativas).
   - Tarjeta de bienvenida con avatar y datos del usuario (desde `profiles`).
   - Tarjetas de estadísticas en tiempo real (muelles, reservas, plantas, proveedores).
   - Estado de los muelles con sus reservas de hoy.
-- **Header global reutilizable** con logo MESA, título y widget de usuario.
+- **Header global reutilizable** con logo EMESA, título y widget de usuario.
 - **Breadcrumb EMESA** (jerarquía `Inicio > Configuración > Submenú`, máx. 3 niveles)
   según la skill `emesa-spa-breadcrumbs`.
 - **Menú de configuración** con módulos y **CRUD genérico** (crear, editar, borrar)
@@ -72,7 +72,7 @@ docksemesa/
 │   │   ├── app.js             # Lógica del dashboard
 │   │   └── navegacion.js      # Utilidades de navegación
 │   ├── images/
-│   │   └── Logo_EMESA.png     # Logo MESA (copiado de la plantilla)
+│   │   └── Logo_EMESA.png     # Logo EMESA (copiado de la plantilla)
 │   └── translations/
 │       ├── es.json            # Traducciones español
 │       ├── en.json            # Traducciones inglés
@@ -127,9 +127,9 @@ que **la clave secreta nunca llega al navegador**:
 
 ## 🎨 Sobre el estilo (adaptado de Plantilla_inicio_SCCZ)
 
-- Paleta: azul corporativo `#1976d2` / `#0d47a1`, rojo MESA `#d71920`,
+- Paleta: azul corporativo `#1976d2` / `#0d47a1`, rojo EMESA `#d71920`,
   azul claro `#cce7f6` y acento naranja `#ff9800`.
-- Header global con gradiente azul, logo MESA y banderas de idioma.
+- Header global con gradiente azul, logo EMESA y banderas de idioma.
 - Tarjetas de bienvenida y acción con animación y elevación al pasar el ratón.
 - Tablas con cabecera azul, filas alternas y badges de estado de reservas.
 - Sistema de traducción por atributos `data-original-text`,

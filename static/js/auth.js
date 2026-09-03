@@ -1,12 +1,12 @@
 // =====================================================================
-// auth.js - Sistema de autenticación MESA DOCK (Supabase vía backend)
+// auth.js - Sistema de autenticación EMESA DOCK (Supabase vía backend)
 // =====================================================================
 // El login se delega en el endpoint /login de Flask, que a su vez usa
 // Supabase Auth (sign_in_with_password). La sesión del navegador se
-// guarda en localStorage bajo la clave 'dockMesaUser' (patrón de la
+// guarda en localStorage bajo la clave 'dockEmesaUser' (patrón de la
 // plantilla, que usaba 'usuarioSGA').
 
-const STORAGE_KEY = 'dockMesaUser';
+const STORAGE_KEY = 'dockEmesaUser';
 
 const Auth = (function () {
   'use strict';
@@ -128,4 +128,4 @@ if (document.readyState === 'loading') {
   Auth.init();
 }
 
-console.log('🔐 Auth cargado - Autenticación MESA DOCK (Supabase)');
+console.log('🔐 Auth cargado - Autenticación EMESA DOCK (Supabase)');

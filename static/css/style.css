@@ -1,19 +1,19 @@
 /* ==========================================================================
-   MESA DOCK - Gestión de Muelles y Reservas
+   EMESA DOCK - Gestión de Muelles y Reservas
    Estilos globales adaptados de la plantilla DIGITALIZATION SCCZ
    ========================================================================== */
 
 /* ======= Variables de color ======= */
 :root {
-  /* Azul principal (identidad MESA) */
-  --color-primario: #1976d2;
-  --color-primario-oscuro: #0d47a1;
+  /* Azul principal (identidad EMESA) */
+  --color-primario: #3880c7;
+  --color-primario-oscuro: #24649e;
   --color-primario-claro: #cce7f6;
   --color-secundario: #e6f2fb;
 
-  /* Rojo MESA (acento de marca) */
-  --color-mesa: #d71920;
-  --color-mesa-claro: #fdecea;
+  /* Rojo EMESA (acento de marca) */
+  --color-emesa: #d71920;
+  --color-emesa-claro: #fdecea;
 
   /* Acentos funcionales */
   --color-acento: #ff9800;
@@ -22,16 +22,16 @@
   --color-texto: #222;
 
   /* Header */
-  --color-header-bg: linear-gradient(135deg, #1976d2 0%, #0d47a1 100%);
+  --color-header-bg: #3880c7;
   --color-header-text: #fff;
 
   /* Botones */
-  --color-boton-bg: #1976d2;
-  --color-boton-hover: #1565c0;
+  --color-boton-bg: #3880c7;
+  --color-boton-hover: #246fae;
   --color-boton-text: #fff;
 
   /* Tablas */
-  --color-tabla-header: #1976d2;
+  --color-tabla-header: #3880c7;
   --color-tabla-row: #eaf0fa;
   --color-tabla-border: #3a59b6;
 
@@ -65,7 +65,8 @@ body {
 /* ======= Header global (estilo plantilla) ======= */
 .global-header {
   background: var(--color-header-bg);
-  padding: 12px 0;
+  min-height: 80px;
+  padding: 10px 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   position: relative;
   z-index: 1000;
@@ -105,10 +106,9 @@ body {
 
 .global-header .header-title {
   color: #fff;
-  font-size: 1.5rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 2px;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: 1px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
@@ -299,7 +299,7 @@ body {
   background: var(--color-boton-bg);
   color: var(--color-boton-text);
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   padding: 0.6rem 1.4rem;
   font-size: 1rem;
   cursor: pointer;
@@ -319,8 +319,8 @@ body {
 .btn-error:hover { background: #c82333; }
 .btn-exito { background: var(--color-exito); color: #fff; }
 .btn-exito:hover { background: #218838; }
-.btn-mesa { background: var(--color-mesa); color: #fff; }
-.btn-mesa:hover { background: #b71c1c; }
+.btn-emesa { background: var(--color-emesa); color: #fff; }
+.btn-emesa:hover { background: #b71c1c; }
 
 /* ======= Contenedor principal / tarjetas ======= */
 .main-container {
@@ -375,7 +375,7 @@ body {
 .user-avatar {
   width: 60px;
   height: 60px;
-  background: linear-gradient(135deg, var(--color-mesa) 0%, #b71c1c 100%);
+  background: linear-gradient(135deg, var(--color-emesa) 0%, #b71c1c 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -420,8 +420,9 @@ body {
 }
 
 .action-card {
-  background: linear-gradient(135deg, var(--color-primario) 0%, #2970b5 100%);
-  color: white;
+  background: var(--color-card-bg);
+  color: var(--color-card-text);
+  border: 2px solid var(--color-card-border);
   padding: 25px;
   border-radius: 12px;
   cursor: pointer;
@@ -429,19 +430,19 @@ body {
   display: flex;
   align-items: center;
   gap: 15px;
-  box-shadow: 0 4px 15px rgba(56, 128, 199, 0.3);
-  border: none;
+  box-shadow: 0 2px 8px rgba(41, 128, 199, 0.08);
   text-align: left;
   font-family: var(--font-main);
 }
 
 .action-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(56, 128, 199, 0.4);
+  transform: translateY(-3px);
+  background: var(--color-card-hover);
+  box-shadow: 0 6px 24px rgba(41, 128, 199, 0.18);
 }
 
 .action-card.disabled {
-  background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+  background: #e1dfe1;
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -467,12 +468,14 @@ body {
 
 .action-description {
   font-size: 0.9rem;
-  opacity: 0.9;
+  color: #4f6f87;
+  opacity: 1;
 }
 
 .action-arrow {
   font-size: 1.5rem;
-  opacity: 0.7;
+  color: var(--color-primario);
+  opacity: 0.8;
 }
 
 /* ======= Tarjetas de estadísticas ======= */
@@ -935,4 +938,44 @@ label {
   .section-title {
     font-size: 1.1rem;
   }
+}
+
+/* ======= Sidebar principal estilo OMEGAS ======= */
+.dashboard-shell { display: flex; flex: 1; min-height: calc(100vh - 130px); }
+.app-sidebar {
+  width: 80px; flex: 0 0 80px; background: #fff; border-right: 1px solid #e6e9ed;
+  display: flex; flex-direction: column; justify-content: space-between;
+  transition: all .3s ease; overflow: hidden; z-index: 900;
+}
+.app-sidebar:hover, .app-sidebar:focus-within { width: 250px; flex-basis: 250px; }
+.sidebar-nav { padding: 16px 15px; display: flex; flex-direction: column; gap: 8px; }
+.sidebar-item {
+  min-height: 48px; display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  color: #4a6377; text-decoration: none; border-left: 3px solid transparent; border-radius: 6px;
+  white-space: nowrap; transition: all .2s ease; font-weight: 600;
+}
+.sidebar-item:hover, .sidebar-item:focus-visible { background: #eef6fd; color: #3880c7; outline: none; }
+.sidebar-item.active { background: #e6f2fb; color: #24649e; border-left-color: #3880c7; }
+.sidebar-icon { width: 24px; flex: 0 0 24px; text-align: center; font-size: 1.35rem; line-height: 1; }
+.sidebar-label { opacity: 0; visibility: hidden; transition: opacity .2s ease; }
+.app-sidebar:hover .sidebar-label, .app-sidebar:focus-within .sidebar-label { opacity: 1; visibility: visible; }
+.config-icon { font-size: 1.35rem; line-height: 1; flex: 0 0 auto; }
+.config-text {
+  max-width: 0; overflow: hidden; opacity: 0; visibility: hidden; white-space: nowrap;
+  transition: max-width .3s ease, opacity .2s ease;
+}
+.app-sidebar:hover .config-text, .app-sidebar:focus-within .config-text { max-width: 160px; opacity: 1; visibility: visible; }
+.config-container { padding: 10px 15px; border-top: 1px solid #eee; }
+.btn-config {
+  width: 100%; border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 10px;
+  cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 0;
+  color: #4a6377; text-decoration: none; font-weight: 600; white-space: nowrap;
+}
+.btn-config:hover, .btn-config:focus-visible { background: #eef6fd; color: #3880c7; outline: none; }
+.dashboard-content { align-items: center; padding-top: 28px; }
+@media (max-width: 700px) {
+  .app-sidebar { width: 64px; flex-basis: 64px; }
+  .app-sidebar:hover, .app-sidebar:focus-within { width: 210px; flex-basis: 210px; }
+  .sidebar-nav { padding-left: 8px; padding-right: 8px; }
+  .config-container { padding-left: 8px; padding-right: 8px; }
 }

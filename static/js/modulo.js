@@ -1,5 +1,5 @@
 // =====================================================================
-// modulo.js - CRUD genérico de módulos de configuración MESA DOCK
+// modulo.js - CRUD genérico de módulos de configuración EMESA DOCK
 // =====================================================================
 // Lee el módulo desde la URL (?tabla=...), carga los datos desde
 // /api/crud/<tabla> y permite crear, editar y eliminar registros.
@@ -614,7 +614,7 @@
       return;
     }
 
-    document.title = `${modulo.titulo} - MESA DOCK`;
+    document.title = `${modulo.titulo} - EMESA DOCK`;
     document.getElementById('moduloTitulo').innerHTML = `${modulo.icono} ${t(modulo.titulo)}`;
 
     // Actualizar el título del header global con el nombre del módulo

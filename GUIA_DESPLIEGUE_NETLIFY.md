@@ -1,4 +1,4 @@
-# Desplegar MESA DOCK: Netlify + Flask + Supabase
+# Desplegar EMESA DOCK: Netlify + Flask + Supabase
 
 ## Diagnóstico del proyecto actual
 
@@ -110,7 +110,7 @@ La carpeta `netlify/` no es necesaria para el backend de Render y se puede conse
 | `SUPABASE_KEY` | La clave de servicio usada por el backend |
 | `SECRET_KEY` | La clave aleatoria generada en el paso anterior |
 
-5. Guarda y despliega. Anota la URL resultante, por ejemplo `https://mesa-dock-api.onrender.com`.
+5. Guarda y despliega. Anota la URL resultante, por ejemplo `https://emesa-dock-api.onrender.com`.
 
 ### 7. Verificar el backend antes de continuar
 

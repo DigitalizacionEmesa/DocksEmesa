@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MESA DOCK - Mis Reservas</title>
+  <title>EMESA DOCK - Mis Reservas</title>
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/breadcrumb.css">
   <style>
@@ -328,7 +328,7 @@
 
   <div class="main-container">
     <div class="cal-head">
-      <h1>📋 Mis Reservas</h1>
+      <h1>📋 <span data-original-text="Mis Reservas">Mis Reservas</span></h1>
     </div>
 
     <div class="cal-toolbar">
@@ -353,12 +353,12 @@
       <span class="semana-titulo" id="fechaTitulo">—</span>
       <div class="fecha-nav">
         <label for="fechaSel" data-original-text="Fecha">Fecha</label>
-        <button type="button" class="btn-nav" id="btnPrevDia" title="Día anterior" aria-label="Día anterior">◀</button>
+        <button type="button" class="btn-nav" id="btnPrevDia" title="Día anterior" aria-label="Día anterior" data-original-title="Día anterior">◀</button>
         <div class="fecha-input-wrap">
-          <input type="text" id="fechaSelTxt" readonly value="—" aria-label="Fecha seleccionada" title="Clic para elegir día">
+          <input type="text" id="fechaSelTxt" readonly value="—" aria-label="Fecha seleccionada" title="Clic para elegir día" data-original-title="Clic para elegir día">
           <input type="date" id="fechaSel" tabindex="-1" aria-hidden="true">
         </div>
-        <button type="button" class="btn-nav" id="btnNextDia" title="Día siguiente" aria-label="Día siguiente">▶</button>
+        <button type="button" class="btn-nav" id="btnNextDia" title="Día siguiente" aria-label="Día siguiente" data-original-title="Día siguiente">▶</button>
         <button class="btn" id="btnHoy" data-original-text="Hoy">Hoy</button>
       </div>
     </div>
@@ -366,8 +366,8 @@
     <div class="leyenda">
       <span><span class="swatch" style="background:#1976d2;"></span><span data-original-text="Mis reservas">Mis reservas</span></span>
       <span><span class="swatch" style="background:#eceff1;border:1px dashed #b0bec5;"></span><span data-original-text="Otros usuarios">Otros usuarios</span></span>
-      <span><span class="swatch" style="background:#e8f5e9;border:1px solid #66bb6a;"></span>Libre</span>
-      <span><span class="swatch" style="background:#f1f3f5;"></span>Cerrado</span>
+      <span><span class="swatch" style="background:#e8f5e9;border:1px solid #66bb6a;"></span><span data-original-text="Libre">Libre</span></span>
+      <span><span class="swatch" style="background:#f1f3f5;"></span><span data-original-text="Cerrado">Cerrado</span></span>
     </div>
 
     <!-- Aviso día pasado -->
@@ -381,18 +381,18 @@
       <table id="calGrid">
         <thead id="calGridHead"></thead>
         <tbody id="calGridBody">
-          <tr><td colspan="8" class="empty-state">Cargando...</td></tr>
+          <tr><td colspan="8" class="empty-state" data-original-text="Cargando...">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
 
     <!-- Vista listado (todas las reservas del usuario) -->
     <div class="listado-wrap oculto" id="vistaLista">
-      <div id="listaCards" class="empty-state">Cargando...</div>
+      <div id="listaCards" class="empty-state" data-original-text="Cargando...">Cargando...</div>
     </div>
 
     <div class="footer-info">
-      <p data-original-text="MESA DOCK · Mis reservas">MESA DOCK · Mis reservas</p>
+      <p data-original-text="EMESA DOCK · Mis reservas">EMESA DOCK · Mis reservas</p>
       <p data-original-text="Tus reservas: haz clic en una reserva para verla, cancelarla o modificarla">Tus reservas: haz clic en una reserva para verla, cancelarla o modificarla</p>
     </div>
   </div>
@@ -401,8 +401,8 @@
   <div class="crud-modal-overlay" id="detalleModal">
     <div class="crud-modal">
       <div class="crud-modal-head">
-        <h3>📋 Detalle de mi reserva</h3>
-        <button class="crud-modal-close" id="detalleClose" title="Cerrar">✕</button>
+        <h3>📋 <span data-original-text="Detalle de mi reserva">Detalle de mi reserva</span></h3>
+        <button class="crud-modal-close" id="detalleClose" title="Cerrar" data-original-title="Cerrar">✕</button>
       </div>
       <div class="crud-modal-body">
         <div id="detalleInfo"></div>
@@ -419,7 +419,7 @@
     <div class="crud-modal">
       <div class="crud-modal-head">
         <h3 data-original-text="Modificar reserva">Modificar reserva</h3>
-        <button class="crud-modal-close" id="editarClose" title="Cerrar">✕</button>
+        <button class="crud-modal-close" id="editarClose" title="Cerrar" data-original-title="Cerrar">✕</button>
       </div>
       <div class="crud-modal-body">
         <form id="editarForm" class="crud-form-grid">

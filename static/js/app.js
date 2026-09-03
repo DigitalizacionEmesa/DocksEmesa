@@ -1,5 +1,5 @@
 // =====================================================================
-// app.js - Controlador del Dashboard MESA DOCK
+// app.js - Controlador del Dashboard EMESA DOCK
 // =====================================================================
 // Carga la información del usuario y los datos de Supabase
 // (estadísticas y estado de muelles) a través del backend Flask.
@@ -68,7 +68,7 @@
   }
 
   // ------------------------------------------------------------------
-  // Visibilidad de tarjetas según permisos por rol
+  // Visibilidad del menú lateral según permisos por rol
   // ------------------------------------------------------------------
   function aplicarPermisosDashboard() {
     if (!window.Permisos) return;
@@ -76,20 +76,16 @@
     const mostrar = (id) => { const el = document.getElementById(id); if (el) el.style.display = ''; };
 
     // Reservas: visible para todos los autenticados (menu:reservas base)
-    if (!Permisos.puedeVerMenu('reservas')) ocultar('cardReservaNueva');
-
-    // Mis Reservas: visible para todos los autenticados
-    if (!Permisos.puedeVerMenu('reservas')) ocultar('cardMisReservas');
-
-    // Ver Calendario: solo admin
-    if (Permisos.tieneRol('admin')) {
-      mostrar('cardCalendario');
-    } else {
-      ocultar('cardCalendario');
+    if (!Permisos.puedeVerMenu('reservas')) {
+      document.querySelectorAll('[data-sidebar-route="/reservas"], [data-sidebar-route="/mis-reservas"]').forEach(el => { el.style.display = 'none'; });
     }
 
+    // Mis Reservas: visible para todos los autenticados
+    // Ver Calendario: solo admin
+    if (!Permisos.tieneRol('admin')) ocultar('sidebarCalendario');
+
     // Configuracion: solo con acceso a configuracion
-    if (!Permisos.tieneAccesoConfig()) ocultar('configCard');
+    if (!Permisos.tieneAccesoConfig()) ocultar('tab-configuracion');
   }
 
   // ------------------------------------------------------------------

@@ -1,5 +1,5 @@
 // =====================================================================
-// navegacion.js - Utilidades de navegación MESA DOCK
+// navegacion.js - Utilidades de navegación EMESA DOCK
 // =====================================================================
 
 /**

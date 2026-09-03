@@ -178,7 +178,7 @@
       if (item.actual) {
         itemHtml = `<span class="breadcrumb-item breadcrumb-last" data-original-text="${item.label}">${item.label}</span>`;
       } else {
-        itemHtml = `<a class="breadcrumb-item breadcrumb-clickable" href="${item.url}" data-target="${item.tipo}${item.submenu ? '|' + item.submenu : ''}">${item.label}</a>`;
+        itemHtml = `<a class="breadcrumb-item breadcrumb-clickable" href="${item.url}" data-target="${item.tipo}${item.submenu ? '|' + item.submenu : ''}" data-original-text="${item.label}">${item.label}</a>`;
       }
 
       return `${separador}${itemHtml}`;

@@ -1,5 +1,5 @@
 -- ==========================================================================
--- 029_unificado.sql — Esquema definitivo simplificado MESA DOCK
+-- 029_unificado.sql — Esquema definitivo simplificado EMESA DOCK
 -- ==========================================================================
 -- EJECUTAR EN EL SQL EDITOR DE SUPABASE.
 -- ⚠️ Borra datos de las tablas de usuarios/permisos antiguas.

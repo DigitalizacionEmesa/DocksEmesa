@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MESA DOCK - Iniciar Sesión</title>
+  <title>EMESA DOCK - Iniciar Sesión</title>
   <link rel="stylesheet" href="/static/css/style.css">
   <style>
     /* ======= Pantalla de login a pantalla completa ======= */
@@ -14,7 +14,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 45%, #42a5f5 100%);
+      background: #e6f2fb;
       font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
     }
 
@@ -29,8 +29,9 @@
 
     .login-card {
       background: #fff;
-      border-radius: 20px;
-      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+      border-radius: 12px;
+      border: 2px solid #b3d6ee;
+      box-shadow: 0 6px 24px rgba(41, 128, 199, 0.18);
       width: 100%;
       max-width: 440px;
       overflow: hidden;
@@ -43,7 +44,7 @@
     }
 
     .login-card-header {
-      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+      background: #3880c7;
       color: #fff;
       padding: 32px 28px 26px 28px;
       text-align: center;
@@ -110,7 +111,7 @@
       width: 100%;
       padding: 12px 16px;
       border: 2px solid #e1e5e9;
-      border-radius: 8px;
+      border-radius: 7px;
       font-size: 1em;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
       box-sizing: border-box;
@@ -121,8 +122,8 @@
 
     .login-field input:focus {
       outline: none;
-      border-color: #1976d2;
-      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.12);
+      border-color: #3880c7;
+      box-shadow: 0 0 0 3px rgba(56, 128, 199, 0.12);
     }
 
     .login-field input.error {
@@ -167,9 +168,9 @@
       font-size: 1.05em;
       font-weight: 700;
       cursor: pointer;
-      background: linear-gradient(135deg, #d71920 0%, #b71c1c 100%);
+      background: #3880c7;
       color: #fff;
-      box-shadow: 0 4px 14px rgba(215, 25, 32, 0.35);
+      box-shadow: 0 4px 14px rgba(56, 128, 199, 0.35);
       transition: all 0.25s ease;
       display: flex;
       align-items: center;
@@ -181,7 +182,8 @@
 
     .login-btn:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(215, 25, 32, 0.45);
+      background: #246fae;
+      box-shadow: 0 6px 20px rgba(56, 128, 199, 0.45);
     }
 
     .login-btn:disabled {
@@ -241,22 +243,22 @@
 <body>
   <div class="login-page">
     <div class="login-card">
-      <!-- Cabecera con marca MESA -->
+      <!-- Cabecera con marca EMESA -->
       <div class="login-card-header">
         <div class="login-logo">
-          <!-- Emblema MESA (swoosh rojo) -->
+          <!-- Emblema EMESA (swoosh rojo) -->
           <svg class="logo-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <linearGradient id="mesaGrad" x1="0" y1="0" x2="1" y2="1">
+              <linearGradient id="emesaGrad" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#e53935"/>
                 <stop offset="100%" stop-color="#b71c1c"/>
               </linearGradient>
             </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#mesaGrad)"/>
+            <circle cx="32" cy="32" r="30" fill="url(#emesaGrad)"/>
             <path d="M 18 40 Q 26 22 34 34 T 48 30" stroke="#fff" stroke-width="6"
                   fill="none" stroke-linecap="round"/>
           </svg>
-          <span class="logo-text" data-original-text="MESA">MESA</span>
+          <span class="logo-text" data-original-text="EMESA">EMESA</span>
           <span class="logo-sub" data-original-text="DOCK">DOCK</span>
         </div>
         <h1 data-original-text="Iniciar Sesión">Iniciar Sesión</h1>
@@ -267,11 +269,11 @@
       <div class="login-card-body">
         <form id="loginForm" autocomplete="on">
           <div class="login-field">
-            <label for="email" data-original-text="Email">Email</label>
-            <input type="email" id="email" name="email"
-                   placeholder="usuario@empresa.com"
-                   data-original-placeholder="usuario@empresa.com"
-                   required autocomplete="email">
+            <label for="email" data-original-text="Email o número de operario">Email o número de operario</label>
+            <input type="text" id="email" name="email"
+                   placeholder="correo o nº de operario"
+                   data-original-placeholder="correo o nº de operario"
+                   required autocomplete="username">
           </div>
 
           <div class="login-field">
@@ -308,7 +310,7 @@
           Conectado a Supabase · Gestión de muelles en tiempo real
         </small>
         <br>
-        <small><span class="brand">MESA DOCK</span> v1.0</small>
+        <small><span class="brand">EMESA DOCK</span> v1.0</small>
       </div>
     </div>
   </div>
@@ -317,7 +319,7 @@
   <script src="/static/js/auth.js"></script>
   <script>
     // ====================================================================
-    // LOGIN - MESA DOCK
+    // LOGIN - EMESA DOCK
     // ====================================================================
     document.addEventListener('DOMContentLoaded', () => {
       // Si ya hay sesión, ir directo al dashboard
@@ -425,6 +427,6 @@
   </script>
 
   <!-- Sistema global (traducciones) si está disponible -->
-  <script src="/static/js/globalHeader.js" data-title="MESA DOCK" data-auto-init="false"></script>
+  <script src="/static/js/globalHeader.js" data-title="EMESA DOCK" data-auto-init="false"></script>
 </body>
 </html>

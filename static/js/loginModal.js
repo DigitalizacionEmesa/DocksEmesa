@@ -1,5 +1,5 @@
 // =====================================================================
-// loginModal.js - Modal de Login Universal MESA DOCK
+// loginModal.js - Modal de Login Universal EMESA DOCK
 // =====================================================================
 // Se muestra automáticamente cuando no hay sesión activa.
 // La autenticación la gestiona Auth (Supabase vía backend /login).
@@ -41,12 +41,12 @@ function createLoginModalHTML() {
 
         <form class="login-modal-form" id="loginModalForm">
           <div class="login-modal-field">
-            <label for="loginModalEmail" class="login-modal-label" data-original-text="Email">Email</label>
-            <input type="email" id="loginModalEmail" name="email"
+            <label for="loginModalEmail" class="login-modal-label" data-original-text="Email o número de operario">Email o número de operario</label>
+            <input type="text" id="loginModalEmail" name="email"
                    class="login-modal-input"
-                   placeholder="usuario@empresa.com"
-                   data-original-placeholder="usuario@empresa.com"
-                   required autocomplete="email">
+                   placeholder="correo o nº de operario"
+                   data-original-placeholder="correo o nº de operario"
+                   required autocomplete="username">
           </div>
 
           <div class="login-modal-field">
@@ -69,8 +69,8 @@ function createLoginModalHTML() {
         </form>
 
         <div class="login-modal-footer">
-          <small data-original-text="💡 Tip: Inicia sesión con tu cuenta corporativa MESA (Supabase)">
-            💡 Tip: Inicia sesión con tu cuenta corporativa MESA (Supabase)
+          <small data-original-text="💡 Tip: Inicia sesión con tu cuenta corporativa EMESA (Supabase)">
+            💡 Tip: Inicia sesión con tu cuenta corporativa EMESA (Supabase)
           </small>
         </div>
       </div>

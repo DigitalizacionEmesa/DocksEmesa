@@ -1,8 +1,8 @@
 // =====================================================================
-// globalHeader.js - Header Global Reutilizable MESA DOCK
+// globalHeader.js - Header Global Reutilizable EMESA DOCK
 // =====================================================================
 // Uso: <script src="/static/js/globalHeader.js" data-title="Mi Título"></script>
-// Incluye: logo MESA, título centrado, selector de idioma (ES/EN/CZ),
+// Incluye: logo EMESA, título centrado, selector de idioma (ES/EN/CZ),
 // widget de usuario y sistema de traducción multi-idioma.
 // Para usarlo SOLO como traductor (sin inyectar header):
 //   data-auto-init="false" → luego llamar a GlobalHeader.changeLanguage(lang)
@@ -12,7 +12,7 @@
 
   const HEADER_CONFIG = {
     logoSrc: '/static/images/Logo_EMESA.png',
-    logoAlt: 'MESA',
+    logoAlt: 'EMESA',
     homeUrl: '/dashboard',
     loginWidgetId: 'loginWidgetContainer'
   };
@@ -134,7 +134,7 @@
     for (const s of scripts) {
       if (s.dataset.title) return s.dataset.title;
     }
-    return document.title || 'MESA DOCK';
+    return document.title || 'EMESA DOCK';
   }
 
   function createHeaderHTML(title) {

@@ -5,11 +5,11 @@ from flask import Flask, render_template, request, jsonify, session
 
 from supabase import create_client
 
-from config import SUPABASE_URL, SUPABASE_KEY
+from config import SUPABASE_URL, SUPABASE_KEY, DATALAKE_ENABLED
 
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "clave-secreta-dockmesa-dev")
+app.secret_key = os.environ.get("SECRET_KEY", "clave-secreta-dockemesa-dev")
 
 
 # Cliente Supabase (service role)
@@ -183,12 +183,28 @@ def dashboard():
 @app.route("/login", methods=["POST"])
 def login():
     datos = request.json or {}
-    email = (datos.get("email") or "").strip()
+    usuario = (datos.get("email") or datos.get("usuario") or "").strip()
     password = datos.get("password") or ""
 
-    if not email or not password:
-        return jsonify({"ok": False, "error": "Email y contrasena son obligatorios."}), 400
+    if not usuario or not password:
+        return jsonify({"ok": False, "error": "Usuario y contrasena son obligatorios."}), 400
 
+    # Correo electrónico -> Supabase Auth. Número de operario -> datalake.
+    if "@" in usuario:
+        return _login_supabase(usuario, password)
+    return _login_datalake(usuario, password)
+
+
+def _construir_nombre_perfil(perfil):
+    """Nombre legible de un perfil, compatible esquema nuevo y antiguo."""
+    if not perfil:
+        return None
+    if perfil.get("nombre") or perfil.get("apellidos"):
+        return f"{perfil.get('nombre', '')} {perfil.get('apellidos', '')}".strip()
+    return f"{perfil.get('first_name', '')} {perfil.get('last_name', '')}".strip()
+
+
+def _login_supabase(email, password):
     try:
         cliente_auth = create_client(SUPABASE_URL, SUPABASE_KEY)
         respuesta = cliente_auth.auth.sign_in_with_password({
@@ -205,14 +221,7 @@ def login():
         except Exception:
             perfil = None
 
-        # Nombre: compatible esquema nuevo (nombre/apellidos) y antiguo (first_name/last_name)
-        if perfil:
-            if perfil.get("nombre") or perfil.get("apellidos"):
-                nombre = f"{perfil.get('nombre', '')} {perfil.get('apellidos', '')}".strip()
-            else:
-                nombre = f"{perfil.get('first_name', '')} {perfil.get('last_name', '')}".strip()
-        else:
-            nombre = None
+        nombre = _construir_nombre_perfil(perfil)
 
         # Obtener nombre del rol (compatible ambos esquemas)
         rol_nombre = _obtener_nombre_rol(supabase, usuario.id)[0] or "proveedor"
@@ -234,6 +243,94 @@ def login():
 
     except Exception:
         return jsonify({"ok": False, "error": "Email o contrasena incorrectos."}), 401
+
+
+def _buscar_usuario_datalake(operario):
+    """Devuelve el id del usuario de la app vinculado al operario del datalake.
+
+    Se intenta por dos vías:
+      1. columna ``numero_operario`` de public.usuarios (migración 033);
+      2. correo corporativo (``Correo`` en el datalake) -> email en Supabase Auth.
+    """
+    # 1) Vinculación directa por número de operario
+    num_operario = operario.get("num_operario")
+    if num_operario:
+        try:
+            fila = (
+                supabase.table("usuarios")
+                .select("id")
+                .eq("numero_operario", num_operario)
+                .execute()
+                .data
+            )
+            if fila:
+                return fila[0].get("id")
+        except Exception:
+            pass
+
+    # 2) Vinculación por correo corporativo
+    correo = (operario.get("correo") or "").strip().lower()
+    if correo:
+        try:
+            usuarios_auth = supabase.auth.admin.list_users()
+            for usuario_auth in usuarios_auth:
+                email_auth = getattr(usuario_auth, "email", None)
+                if email_auth and email_auth.lower() == correo:
+                    return getattr(usuario_auth, "id", None)
+        except Exception:
+            pass
+
+    return None
+
+
+def _login_datalake(num_operario, password):
+    """Autentica un operario contra el datalake y lo vincula a su perfil de la app."""
+    if not DATALAKE_ENABLED:
+        return jsonify({"ok": False, "error": "El acceso por operario no está disponible."}), 501
+
+    try:
+        import datalake
+    except Exception:
+        return jsonify({"ok": False, "error": "El acceso por operario no está disponible (falta el conector ODBC)."}), 501
+
+    try:
+        operario = datalake.buscar_operario(num_operario, password)
+    except Exception:
+        return jsonify({"ok": False, "error": "No se pudo conectar con el datalake. Contacta con un administrador."}), 502
+
+    if not operario:
+        return jsonify({"ok": False, "error": "Usuario o contrasena incorrectos."}), 401
+
+    user_id = _buscar_usuario_datalake(operario)
+    perfil = None
+    if user_id:
+        try:
+            perfil = supabase.table("usuarios").select("*").eq("id", user_id).single().execute().data
+        except Exception:
+            perfil = None
+
+    if not user_id or not perfil:
+        return jsonify({"ok": False, "error": "Tu operario no tiene un perfil en la aplicación. Contacta con un administrador."}), 401
+
+    nombre = _construir_nombre_perfil(perfil) or operario.get("nombre") or num_operario
+    rol_nombre = _obtener_nombre_rol(supabase, user_id)[0] or "interno"
+
+    user = {
+        "id": user_id,
+        "email": perfil.get("email") or None,
+        "nombre": nombre,
+        "rol": rol_nombre,
+        "origen_login": "datalake",
+    }
+    user = enriquecer_usuario(supabase, user)
+
+    # Sin token de Supabase Auth: el cliente usa service role (respeta la lógica
+    # de permisos calculada desde el perfil vinculado).
+    session.pop("access_token", None)
+    session.pop("refresh_token", None)
+    session["user"] = user
+
+    return jsonify({"ok": True, "user": user})
 
 
 @app.route("/logout", methods=["POST"])
@@ -1427,10 +1524,19 @@ def api_usuarios():
             except Exception:
                 pass
 
-            usuarios_rows = supabase.table("usuarios").select("*").order("nombre").execute().data
+            # Lectura compatible con ambos esquemas: si la tabla esta vacia o la
+            # columna no existe, no debe romper el endpoint (500).
+            usuarios_rows = []
+            try:
+                usuarios_rows = supabase.table("usuarios").select("*").order("nombre").execute().data
+            except Exception:
+                usuarios_rows = []
             # Si no hay resultados con 'nombre', intentar con 'first_name' (esquema antiguo)
             if not usuarios_rows:
-                usuarios_rows = supabase.table("usuarios").select("*").order("first_name").execute().data
+                try:
+                    usuarios_rows = supabase.table("usuarios").select("*").order("first_name").execute().data
+                except Exception:
+                    usuarios_rows = []
 
             usuarios = []
             for u in (usuarios_rows or []):
@@ -1459,6 +1565,9 @@ def api_usuarios():
                     "role_name": role_name,
                     "proveedor_id": prov_id,
                     "departamento_id": depto_id,
+                    "numero_operario": u.get("numero_operario") or "",
+                    "origen_operario": u.get("origen_operario") or "",
+                    "tipo_usuario_forzado": u.get("tipo_usuario_forzado") or "",
                     "activo": u.get("activo") if "activo" in u else u.get("active", True),
                 })
             return jsonify({"usuarios": usuarios})
@@ -1490,6 +1599,9 @@ def api_usuarios():
             "rol_id": body.get("rol_id") or None,
             "proveedor_id": body.get("proveedor_id") or None,
             "departamento_id": body.get("departamento_id") or None,
+            "numero_operario": body.get("numero_operario") or None,
+            "origen_operario": body.get("origen_operario") or None,
+            "tipo_usuario_forzado": body.get("tipo_usuario_forzado") or None,
             "activo": body.get("activo", True),
         }).execute()
 
@@ -1520,7 +1632,7 @@ def api_usuario(id):
     body = request.json or {}
     try:
         datos = {}
-        for campo in ["nombre", "apellidos", "rol_id", "proveedor_id", "departamento_id"]:
+        for campo in ["nombre", "apellidos", "rol_id", "proveedor_id", "departamento_id", "numero_operario", "origen_operario", "tipo_usuario_forzado"]:
             if campo in body:
                 datos[campo] = body[campo]
         if "activo" in body:

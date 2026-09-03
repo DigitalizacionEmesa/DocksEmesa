@@ -1,7 +1,7 @@
 // =====================================================================
-// supabase.js - Configuración de Supabase para MESA DOCK
+// supabase.js - Configuración de Supabase para EMESA DOCK
 // =====================================================================
-// MESA DOCK está conectado a Supabase. La autenticación y las consultas
+// EMESA DOCK está conectado a Supabase. La autenticación y las consultas
 // se realizan a través del backend Flask (que usa el cliente Python de
 // Supabase con la clave de servicio), de modo que la clave secreta
 // nunca llega al navegador.

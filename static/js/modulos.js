@@ -1,5 +1,5 @@
 // =====================================================================
-// modulos.js - Registro de modulos de configuracion MESA DOCK
+// modulos.js - Registro de modulos de configuracion EMESA DOCK
 // =====================================================================
 // Esquema simplificado: plantas -> naves -> muelles
 

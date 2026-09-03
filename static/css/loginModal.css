@@ -1,5 +1,5 @@
 /* loginModal.css - Modal de Login Universal (estilo plantilla DIGITALIZATION SCCZ)
-   Adaptado para MESA DOCK / Supabase
+   Adaptado para EMESA DOCK / Supabase
    ================================================================ */
 
 /* --- OVERLAY PRINCIPAL --- */
@@ -9,7 +9,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(9, 18, 38, 0.5);
   backdrop-filter: blur(3px);
   z-index: 10000;
   display: flex;
@@ -28,8 +28,9 @@
 /* --- CONTENEDOR DEL MODAL --- */
 .login-modal-container {
   background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  border: 2px solid #b3d6ee;
+  box-shadow: 0 10px 40px rgba(41, 128, 199, 0.22);
   width: 90%;
   max-width: 440px;
   max-height: 90vh;
@@ -43,12 +44,12 @@
   transform: scale(1) translateY(0);
 }
 
-/* --- HEADER DEL MODAL (gradiente azul MESA) --- */
+/* --- HEADER DEL MODAL (gradiente azul EMESA) --- */
 .login-modal-header {
-  background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+  background: #3880c7;
   color: white;
   padding: 24px;
-  border-radius: 16px 16px 0 0;
+  border-radius: 10px 10px 0 0;
   text-align: center;
   position: relative;
 }
@@ -95,8 +96,8 @@
 
 .login-modal-input:focus {
   outline: none;
-  border-color: #1976d2;
-  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+  border-color: #3880c7;
+  box-shadow: 0 0 0 3px rgba(56, 128, 199, 0.1);
 }
 
 .login-modal-input.error {
@@ -169,14 +170,14 @@
 }
 
 .login-modal-btn-primary {
-  background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+  background: #3880c7;
   color: white;
-  box-shadow: 0 2px 8px rgba(13, 71, 161, 0.3);
+  box-shadow: 0 2px 8px rgba(41, 128, 199, 0.3);
 }
 
 .login-modal-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0a3a86 0%, #1565c0 100%);
-  box-shadow: 0 4px 12px rgba(13, 71, 161, 0.4);
+  background: #246fae;
+  box-shadow: 0 4px 12px rgba(41, 128, 199, 0.4);
   transform: translateY(-1px);
 }
 

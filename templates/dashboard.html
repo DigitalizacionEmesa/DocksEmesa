@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MESA DOCK - Gestión de Muelles</title>
+  <title>EMESA DOCK - Gestión de Muelles</title>
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/breadcrumb.css">
   <style>
@@ -42,7 +42,7 @@
     }
   </style>
 </head>
-<body>
+<body class="dashboard-page">
   <!-- Header global inyectado por globalHeader.js -->
   <div class="header"></div>
   <script src="/static/js/globalHeader.js" data-title="Gestión de Muelles"></script>
@@ -52,7 +52,30 @@
     <div class="breadcrumb-container" id="breadcrumb"></div>
   </nav>
 
-  <div class="main-container">
+  <div class="dashboard-shell">
+    <aside class="app-sidebar" aria-label="Navegación principal">
+      <nav class="sidebar-nav">
+        <a class="sidebar-item" href="/dashboard" data-sidebar-route="/dashboard" aria-label="Inicio">
+          <span class="sidebar-icon" aria-hidden="true">🏠</span><span class="sidebar-label" data-original-text="Inicio">Inicio</span>
+        </a>
+        <a class="sidebar-item" href="/reservas" data-sidebar-route="/reservas" aria-label="Reservar muelle">
+          <span class="sidebar-icon" aria-hidden="true">🚛</span><span class="sidebar-label" data-original-text="Reservar muelle">Reservar muelle</span>
+        </a>
+        <a class="sidebar-item" href="/mis-reservas" data-sidebar-route="/mis-reservas" aria-label="Mis reservas">
+          <span class="sidebar-icon" aria-hidden="true">📋</span><span class="sidebar-label" data-original-text="Mis reservas">Mis reservas</span>
+        </a>
+        <a id="sidebarCalendario" class="sidebar-item" href="/calendario" data-sidebar-route="/calendario" aria-label="Calendario">
+          <span class="sidebar-icon" aria-hidden="true">📅</span><span class="sidebar-label" data-original-text="Calendario">Calendario</span>
+        </a>
+      </nav>
+      <div class="config-container">
+        <a id="tab-configuracion" class="btn-config" href="/configuracion" aria-label="Configuración">
+          <span class="config-icon" aria-hidden="true">⚙️</span><span class="config-text" data-original-text="Configuración">Configuración</span>
+        </a>
+      </div>
+    </aside>
+
+    <main class="main-container dashboard-content">
     <!-- Estadísticas desde Supabase -->
     <h2 class="section-title" data-original-text="Resumen del día">📊 Resumen del día</h2>
     <div class="stats-grid" id="statsGrid">
@@ -70,51 +93,11 @@
       </div>
     </div>
 
-    <!-- Acciones principales -->
-    <h2 class="section-title" data-original-text="Acciones">⚡ Acciones</h2>
-    <div class="actions-grid">
-      <button class="action-card" id="cardReservaNueva" onclick="window.location.href='/reservas'">
-        <span class="action-icon">📅</span>
-        <span class="action-content">
-          <span class="action-title" data-original-text="Reservar Muelle">Reservar Muelle</span>
-          <span class="action-description" data-original-text="Calendario semanal de disponibilidad">Calendario semanal de disponibilidad</span>
-        </span>
-        <span class="action-arrow">→</span>
-      </button>
-
-      <button class="action-card" id="cardMisReservas" onclick="window.location.href='/mis-reservas'">
-        <span class="action-icon">📋</span>
-        <span class="action-content">
-          <span class="action-title" data-original-text="Mis Reservas">Mis Reservas</span>
-          <span class="action-description" data-original-text="Tus reservas: verlas, cancelarlas o modificarlas">Tus reservas: verlas, cancelarlas o modificarlas</span>
-        </span>
-        <span class="action-arrow">→</span>
-      </button>
-
-      <!-- Solo visible para admin (lo muestra app.js) -->
-      <button class="action-card" id="cardCalendario" onclick="window.location.href='/calendario'" style="display:none;">
-        <span class="action-icon">🗓️</span>
-        <span class="action-content">
-          <span class="action-title" data-original-text="Ver Calendario">Ver Calendario</span>
-          <span class="action-description" data-original-text="Vista semanal de reservas (solo lectura)">Vista semanal de reservas (solo lectura)</span>
-        </span>
-        <span class="action-arrow">→</span>
-      </button>
-
-      <button class="action-card" id="configCard" onclick="window.location.href='/configuracion'">
-        <span class="action-icon">⚙️</span>
-        <span class="action-content">
-          <span class="action-title" data-original-text="Configuración">Configuración</span>
-          <span class="action-description" data-original-text="Administración del sistema">Administración del sistema</span>
-        </span>
-        <span class="action-arrow">→</span>
-      </button>
-    </div>
-
     <div class="footer-info">
-      <p data-original-text="MESA DOCK · Gestión de Muelles y Reservas">MESA DOCK · Gestión de Muelles y Reservas</p>
+      <p data-original-text="EMESA DOCK · Gestión de Muelles y Reservas">EMESA DOCK · Gestión de Muelles y Reservas</p>
       <p data-original-text="Conectado a Supabase">Conectado a Supabase</p>
     </div>
+    </main>
   </div>
 
   <script src="/static/js/navegacion.js"></script>
@@ -122,6 +105,7 @@
   <script src="/static/js/auth.js"></script>
   <script src="/static/js/permisos.js"></script>
   <script src="/static/js/app.js"></script>
+  <script src="/static/js/sidebar.js"></script>
   <script src="/static/js/breadcrumb.js"></script>
 
   <!-- Modal de login universal (se muestra si no hay sesión) -->

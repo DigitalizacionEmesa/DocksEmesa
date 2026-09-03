@@ -1,5 +1,5 @@
 // =====================================================================
-// usuarios.js - Gestion de usuarios MESA DOCK
+// usuarios.js - Gestion de usuarios EMESA DOCK
 // =====================================================================
 // Tabla usuarios: nombre, apellidos, rol_id (FK roles), proveedor_id,
 // departamento_id, activo. Las plantas se asignan aqui y se guardan
@@ -83,8 +83,8 @@
   function pintarFilas(datos) {
     var tbody = document.getElementById("moduloTbody");
     var thead = document.getElementById("moduloThead");
-    thead.innerHTML = "<tr><th>" + t("Nombre") + "</th><th>Email</th><th>" + t("Rol") + "</th><th>" + t("Depto") + "</th><th>" + t("Proveedor") + "</th><th>" + t("Plantas") + "</th><th>" + t("Activo") + "</th><th>" + t("Acciones") + "</th></tr>";
-    if (!datos.length) { tbody.innerHTML = "<tr><td colspan=\"8\" class=\"empty-state\">" + t("No hay registros") + "</td></tr>"; return; }
+    thead.innerHTML = "<tr><th>" + t("Nombre") + "</th><th>Email</th><th>" + t("Operario") + "</th><th>" + t("Rol") + "</th><th>" + t("Depto") + "</th><th>" + t("Proveedor") + "</th><th>" + t("Plantas") + "</th><th>" + t("Activo") + "</th><th>" + t("Acciones") + "</th></tr>";
+    if (!datos.length) { tbody.innerHTML = "<tr><td colspan=\"9\" class=\"empty-state\">" + t("No hay registros") + "</td></tr>"; return; }
     var yo = window.Auth ? Auth.getCurrentUser() : null;
     tbody.innerHTML = datos.map(function(u) {
       var nombre = ((u.nombre || "") + " " + (u.apellidos || "")).trim() || "\u2014";
@@ -99,7 +99,8 @@
       }).filter(Boolean).join(", ") || "\u2014";
       var activoHtml = u.activo !== false ? "<span class=\"badge badge-completed\">" + t("Sí") + "</span>" : "<span class=\"badge badge-cancelled\">" + t("No") + "</span>";
       var esYo = yo && yo.id === u.id;
-      return "<tr><td><strong>" + esc(nombre) + "</strong></td><td>" + esc(u.email || "\u2014") + "</td><td><span class=\"badge badge-in_progress\">" + esc(rolNombre) + "</span></td><td>" + esc(deptoNombre) + "</td><td>" + esc(provNombre) + "</td><td style=\"max-width:180px;\">" + esc(plantasTxt) + "</td><td>" + activoHtml + "</td><td class=\"acciones-cell\"><button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editar('" + u.id + "')\">\u270f " + t("Editar") + "</button>" + (esYo ? "" : "<button class=\"action-button btn-del\" onclick=\"window.Usuarios.eliminar('" + u.id + "')\">\ud83d\uddd1 " + t("Eliminar") + "</button>") + "</td></tr>";
+      var operario = u.numero_operario ? u.numero_operario + (u.origen_operario ? " · " + u.origen_operario : "") : "\u2014";
+      return "<tr><td><strong>" + esc(nombre) + "</strong></td><td>" + esc(u.email || "\u2014") + "</td><td>" + esc(operario) + "</td><td><span class=\"badge badge-in_progress\">" + esc(rolNombre) + "</span></td><td>" + esc(deptoNombre) + "</td><td>" + esc(provNombre) + "</td><td style=\"max-width:180px;\">" + esc(plantasTxt) + "</td><td>" + activoHtml + "</td><td class=\"acciones-cell\"><button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editar('" + u.id + "')\">\u270f " + t("Editar") + "</button>" + (esYo ? "" : "<button class=\"action-button btn-del\" onclick=\"window.Usuarios.eliminar('" + u.id + "')\">\ud83d\uddd1 " + t("Eliminar") + "</button>") + "</td></tr>";
     }).join("");
     if (window.GlobalHeader) window.GlobalHeader.translatePage();
   }
@@ -138,6 +139,8 @@
       + "<div class=\"crud-field\"><label>" + (esCrear ? t("Contrasena") : t("Nueva contrasena (opcional)")) + "</label><input type=\"password\" id=\"f_password\" " + (esCrear ? "required" : "") + " placeholder=\"" + (esCrear ? "\u2022\u2022\u2022\u2022\u2022\u2022" : t("Dejar vacio")) + "\"></div>"
       + "<div class=\"crud-field\"><label>" + t("Nombre") + "</label><input type=\"text\" id=\"f_nombre\" value=\"" + esc(usuario ? usuario.nombre : "") + "\" required></div>"
       + "<div class=\"crud-field\"><label>" + t("Apellidos") + "</label><input type=\"text\" id=\"f_apellidos\" value=\"" + esc(usuario ? usuario.apellidos : "") + "\"></div>"
+      + "<div class=\"crud-field\"><label>" + t("Número de operario") + "</label><input type=\"text\" id=\"f_numero_operario\" value=\"" + esc(usuario ? usuario.numero_operario : "") + "\" inputmode=\"numeric\"></div>"
+      + "<div class=\"crud-field\"><label>" + t("Origen del operario") + "</label><select id=\"f_origen_operario\"><option value=\"\">—</option><option value=\"EMESA\"" + selVal("EMESA", usuario ? usuario.origen_operario : "") + ">EMESA</option><option value=\"MAPEX\"" + selVal("MAPEX", usuario ? usuario.origen_operario : "") + ">MAPEX</option></select></div>"
       + "<div class=\"crud-field\"><label>" + t("Rol") + "</label><select id=\"f_rol_id\" required>" + rolOpts + "</select></div>"
       + "<div class=\"crud-field\"><label>" + t("Departamento") + "</label><select id=\"f_departamento_id\">" + deptoOpts + "</select></div>"
       + "<div class=\"crud-field\"><label>" + t("Proveedor") + "</label><select id=\"f_proveedor_id\">" + provOpts + "</select></div>"
@@ -153,7 +156,7 @@
       return (r ? r.nombre : "").toLowerCase();
     }
     function aplicarBloqueoProveedor() {
-      var permitido = nombreRolSeleccionado() === "externo";
+      var permitido = nombreRolSeleccionado() === "externo" || nombreRolSeleccionado() === "proveedor";
       provSel.disabled = !permitido;
       if (!permitido) provSel.value = "";
     }
@@ -193,6 +196,8 @@
       rol_id: rolId,
       proveedor_id: document.getElementById("f_proveedor_id").value || null,
       departamento_id: document.getElementById("f_departamento_id").value || null,
+      numero_operario: document.getElementById("f_numero_operario").value.trim() || null,
+      origen_operario: document.getElementById("f_origen_operario").value || null,
       activo: document.getElementById("f_activo").checked
     };
     if (editandoId) { delete cuerpo.email; if (!cuerpo.password) delete cuerpo.password; }
