@@ -8,3 +8,5 @@ venv/
 !.env.example
 fernet.key
 operarios.csv
+operarios_sinhas.csv
+operarios_scrypt_*.sql

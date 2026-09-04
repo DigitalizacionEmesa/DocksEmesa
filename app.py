@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, jsonify, session
 
 from supabase import create_client
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from config import SUPABASE_URL, SUPABASE_KEY, DATALAKE_ENABLED
 
@@ -190,13 +190,14 @@ def login():
     usuario = (datos.get("email") or datos.get("usuario") or "").strip()
     password = datos.get("password") or ""
 
-    if not usuario or not password:
-        return jsonify({"ok": False, "error": "Usuario y contrasena son obligatorios."}), 400
-
     # Correo electrónico -> Supabase Auth. Número de operario -> copia segura
     # de credenciales corporativas importada en Supabase.
     if "@" in usuario:
+        if not usuario or not password:
+            return jsonify({"ok": False, "error": "Usuario y contrasena son obligatorios."}), 400
         return _login_supabase(usuario, password)
+    if not usuario:
+        return jsonify({"ok": False, "error": "Indica el número de operario."}), 400
     return _login_operario_supabase(usuario, password)
 
 
@@ -323,7 +324,15 @@ def _login_operario_supabase(num_operario, password):
         logger.exception("Fallo consultando el operario %s: %s", num_operario, exc)
         return jsonify({"ok": False, "error": "No se pudo comprobar el acceso del operario."}), 503
 
-    if not datos or not datos.get("activo") or not _verificar_password_operario(datos.get("password_hash"), password):
+    if not datos or not datos.get("activo"):
+        return jsonify({"ok": False, "error": "Usuario o contrasena incorrectos."}), 401
+
+    if not str(datos.get("password_hash") or "").strip():
+        return jsonify({"ok": False, "password_pending": True,
+                        "numero_operario": str(num_operario).strip(),
+                        "error": "Este operario todavía no tiene una contraseña configurada."}), 409
+
+    if not _verificar_password_operario(datos.get("password_hash"), password):
         return jsonify({"ok": False, "error": "Usuario o contrasena incorrectos."}), 401
 
     try:
@@ -347,6 +356,49 @@ def _login_operario_supabase(num_operario, password):
     session.pop("refresh_token", None)
     session["user"] = user
     return jsonify({"ok": True, "user": user})
+
+
+@app.route("/operarios/configurar-contrasena", methods=["POST"])
+def configurar_contrasena_operario():
+    """Guarda la primera contraseña de un operario pendiente."""
+    datos = request.json or {}
+    num_operario = str(datos.get("numero_operario") or "").strip()
+    password = str(datos.get("password") or "")
+    confirmacion = str(datos.get("confirmacion") or "")
+
+    if not num_operario or not password or not confirmacion:
+        return jsonify({"ok": False, "error": "Completa y confirma la nueva contraseña."}), 400
+    if password != confirmacion:
+        return jsonify({"ok": False, "error": "Las contraseñas no coinciden."}), 400
+    if len(password) < 5 or len(password) > 256:
+        return jsonify({"ok": False, "error": "La contraseña debe tener entre 5 y 256 caracteres."}), 400
+    if not supabase:
+        return jsonify({"ok": False, "error": "Supabase no está configurado."}), 503
+
+    try:
+        operario = (supabase.table("operarios_login").select("numero_operario,password_hash,activo")
+                    .eq("numero_operario", num_operario).single().execute().data)
+    except Exception as exc:
+        logger.exception("Fallo consultando el operario %s: %s", num_operario, exc)
+        return jsonify({"ok": False, "error": "No se pudo configurar la contraseña."}), 503
+
+    if not operario or not operario.get("activo"):
+        return jsonify({"ok": False, "error": "Operario no disponible."}), 404
+    if str(operario.get("password_hash") or "").strip():
+        return jsonify({"ok": False, "error": "Este operario ya tiene una contraseña configurada."}), 409
+
+    try:
+        resultado = (supabase.table("operarios_login")
+                     .update({"password_hash": generate_password_hash(password),
+                              "actualizado_en": datetime.now(timezone.utc).isoformat()})
+                     .eq("numero_operario", num_operario).eq("password_hash", "").execute())
+        if not resultado.data:
+            return jsonify({"ok": False, "error": "La contraseña ya fue configurada. Inicia sesión."}), 409
+    except Exception as exc:
+        logger.exception("Fallo guardando la contraseña inicial del operario %s: %s", num_operario, exc)
+        return jsonify({"ok": False, "error": "No se pudo guardar la contraseña."}), 503
+
+    return jsonify({"ok": True})
 
 
 def _login_datalake(num_operario, password):

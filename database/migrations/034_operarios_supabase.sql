@@ -19,6 +19,7 @@ create table if not exists public.operarios_login (
 alter table public.operarios_login enable row level security;
 
 revoke all on table public.operarios_login from anon, authenticated;
+grant select on table public.operarios_login to service_role;
 
 comment on table public.operarios_login is
     'Credenciales corporativas cifradas importadas. Acceso exclusivo del backend.';

@@ -64,6 +64,7 @@ const SupabaseApp = (function () {
     if (!response.ok) {
       const err = new Error((data && data.error) || `Error HTTP ${response.status}`);
       err.status = response.status;
+      err.data = data;
       throw err;
     }
     return data;

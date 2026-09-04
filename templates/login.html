@@ -234,6 +234,17 @@
     .login-register a { color: #1976d2; font-weight: 600; text-decoration: none; }
     .login-register a:hover { text-decoration: underline; }
 
+    .password-setup {
+      display: none;
+      margin-top: -4px;
+      padding: 14px;
+      border: 1px solid #b3d6ee;
+      border-radius: 8px;
+      background: #f5faff;
+    }
+
+    .password-setup p { margin: 0 0 14px; color: #245d91; font-size: .9rem; }
+
     @media (max-width: 480px) {
       .login-card-body { padding: 26px 20px 22px 20px; }
       .login-card-header { padding: 26px 20px 22px 20px; }
@@ -282,6 +293,18 @@
                    placeholder="••••••••"
                    data-original-placeholder="••••••••"
                    required autocomplete="current-password">
+          </div>
+
+          <div id="passwordSetup" class="password-setup" aria-live="polite">
+            <p>Este usuario no tiene contraseña configurada. Crea una para poder acceder.</p>
+            <div class="login-field">
+              <label for="newPassword">Nueva contraseña</label>
+              <input type="password" id="newPassword" autocomplete="new-password" placeholder="Nueva contraseña">
+            </div>
+            <div class="login-field" style="margin-bottom: 0;">
+              <label for="confirmPassword">Confirmar contraseña</label>
+              <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Repite la contraseña">
+            </div>
           </div>
 
           <div id="loginMessage" class="login-message"></div>
@@ -335,6 +358,9 @@
       const messageDiv = document.getElementById('loginMessage');
       const emailInput = document.getElementById('email');
       const passwordInput = document.getElementById('password');
+      const passwordSetup = document.getElementById('passwordSetup');
+      const newPasswordInput = document.getElementById('newPassword');
+      const confirmPasswordInput = document.getElementById('confirmPassword');
       const btn = document.getElementById('loginBtn');
       const btnText = btn.querySelector('.login-btn-text');
       const spinner = btn.querySelector('.login-spinner');
@@ -352,6 +378,13 @@
         messageDiv.style.display = 'none';
         messageDiv.textContent = '';
         messageDiv.className = 'login-message';
+      }
+
+      function mostrarConfiguracionContrasena() {
+        passwordSetup.style.display = 'block';
+        passwordInput.value = '';
+        passwordInput.required = false;
+        newPasswordInput.focus();
       }
 
       // Si venimos de completar el registro, mostrar aviso
@@ -373,13 +406,27 @@
         e.preventDefault();
 
         const email = emailInput.value.trim();
-        const password = passwordInput.value;
+        let password = passwordInput.value;
 
-        if (!email || !password) {
+        const esOperario = email && !email.includes('@');
+        const configurandoContrasena = passwordSetup.style.display === 'block';
+
+        if (!email || (!esOperario && !password)) {
           showMessage(t('Por favor, complete todos los campos.'));
           if (!email) emailInput.classList.add('error');
-          if (!password) passwordInput.classList.add('error');
+          if (!password && !esOperario) passwordInput.classList.add('error');
           return;
+        }
+
+        if (configurandoContrasena) {
+          if (!newPasswordInput.value || !confirmPasswordInput.value) {
+            showMessage('Completa y confirma la nueva contraseña.');
+            return;
+          }
+          if (newPasswordInput.value !== confirmPasswordInput.value) {
+            showMessage('Las contraseñas no coinciden.');
+            return;
+          }
         }
 
         // Estado de carga
@@ -389,12 +436,29 @@
         clearMessage();
 
         try {
+          if (configurandoContrasena) {
+            await SupabaseApp.api('/operarios/configurar-contrasena', {
+              method: 'POST',
+              body: {
+                numero_operario: email,
+                password: newPasswordInput.value,
+                confirmacion: confirmPasswordInput.value
+              }
+            });
+            passwordInput.value = newPasswordInput.value;
+            password = newPasswordInput.value;
+          }
           const user = await Auth.login(email, password);
           if (user) {
             showMessage(t('¡Bienvenido') + ', ' + (user.nombre || email) + '!', 'success');
             setTimeout(() => { window.location.href = '/dashboard'; }, 800);
           }
         } catch (err) {
+          if (err.status === 409 && err.data && err.data.password_pending) {
+            mostrarConfiguracionContrasena();
+            showMessage(err.message, 'success');
+            return;
+          }
           showMessage(err.message || t('Usuario o contraseña incorrectos.'));
           emailInput.classList.add('error');
           passwordInput.classList.add('error');
