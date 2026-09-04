@@ -1,10 +1,12 @@
 import logging
 import os
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, render_template, request, jsonify, session
 
 from supabase import create_client
+from werkzeug.security import check_password_hash
 
 from config import SUPABASE_URL, SUPABASE_KEY, DATALAKE_ENABLED
 
@@ -191,10 +193,11 @@ def login():
     if not usuario or not password:
         return jsonify({"ok": False, "error": "Usuario y contrasena son obligatorios."}), 400
 
-    # Correo electrónico -> Supabase Auth. Número de operario -> datalake.
+    # Correo electrónico -> Supabase Auth. Número de operario -> copia segura
+    # de credenciales corporativas importada en Supabase.
     if "@" in usuario:
         return _login_supabase(usuario, password)
-    return _login_datalake(usuario, password)
+    return _login_operario_supabase(usuario, password)
 
 
 def _construir_nombre_perfil(perfil):
@@ -286,6 +289,64 @@ def _buscar_usuario_datalake(operario):
             pass
 
     return None
+
+
+def _verificar_password_operario(almacenada, en_claro):
+    """Valida los formatos de hash presentes en el export corporativo."""
+    guardada = str(almacenada or "").strip()
+    texto = str(en_claro or "").strip()
+    if not guardada or not texto:
+        return False
+    if len(guardada) == 64 and all(c in "0123456789abcdefABCDEF" for c in guardada):
+        return hashlib.sha256(texto.encode("utf-8")).hexdigest().lower() == guardada.lower()
+    try:
+        return check_password_hash(guardada, texto)
+    except Exception:
+        return False
+
+
+def _login_operario_supabase(num_operario, password):
+    """Autentica con la copia de hashes corporativos almacenada en Supabase."""
+    if not supabase:
+        return jsonify({"ok": False, "error": "Supabase no está configurado."}), 503
+
+    try:
+        datos = (
+            supabase.table("operarios_login")
+            .select("usuario_id,numero_operario,nombre,password_hash,activo")
+            .eq("numero_operario", str(num_operario).strip())
+            .single()
+            .execute()
+            .data
+        )
+    except Exception as exc:
+        logger.exception("Fallo consultando el operario %s: %s", num_operario, exc)
+        return jsonify({"ok": False, "error": "No se pudo comprobar el acceso del operario."}), 503
+
+    if not datos or not datos.get("activo") or not _verificar_password_operario(datos.get("password_hash"), password):
+        return jsonify({"ok": False, "error": "Usuario o contrasena incorrectos."}), 401
+
+    try:
+        perfil = supabase.table("usuarios").select("*").eq("id", datos["usuario_id"]).single().execute().data
+    except Exception as exc:
+        logger.exception("Operario %s sin perfil aplicacion: %s", num_operario, exc)
+        return jsonify({"ok": False, "error": "El operario no tiene perfil en la aplicación."}), 403
+
+    if not perfil or perfil.get("activo") is False:
+        return jsonify({"ok": False, "error": "El operario no tiene acceso activo."}), 403
+
+    user = {
+        "id": datos["usuario_id"],
+        "email": perfil.get("email"),
+        "nombre": _construir_nombre_perfil(perfil) or datos.get("nombre") or str(num_operario),
+        "rol": _obtener_nombre_rol(supabase, datos["usuario_id"])[0] or "interno",
+        "origen_login": "operarios_supabase",
+    }
+    user = enriquecer_usuario(supabase, user)
+    session.pop("access_token", None)
+    session.pop("refresh_token", None)
+    session["user"] = user
+    return jsonify({"ok": True, "user": user})
 
 
 def _login_datalake(num_operario, password):
