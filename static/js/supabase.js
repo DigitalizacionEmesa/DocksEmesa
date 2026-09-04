@@ -11,7 +11,7 @@
 // desde el CDN (window.SupabaseApp.getClient()).
 
 const SUPABASE_CONFIG = {
-  url: 'https://aeqvtjenbnhglhuchokw.supabase.co',
+  url: 'https://oxmrtpegdxbohtgoywyw.supabase.co',
   // ANON KEY pública (opcional para cliente directo):
   anonKey: ''
 };

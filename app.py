@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -10,6 +11,7 @@ from config import SUPABASE_URL, SUPABASE_KEY, DATALAKE_ENABLED
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-secreta-dockemesa-dev")
+logger = logging.getLogger(__name__)
 
 
 # Cliente Supabase (service role)
@@ -241,7 +243,10 @@ def _login_supabase(email, password):
 
         return jsonify({"ok": True, "user": user})
 
-    except Exception:
+    except Exception as exc:
+        # No exponer detalles internos al usuario, pero conservarlos en los
+        # logs de Render para distinguir Auth de errores de esquema/perfil.
+        logger.exception("Fallo durante login Supabase para %s: %s", email, exc)
         return jsonify({"ok": False, "error": "Email o contrasena incorrectos."}), 401
 
 
