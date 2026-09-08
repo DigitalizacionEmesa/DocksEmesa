@@ -50,7 +50,7 @@
       gap: 4px;
       margin-bottom: 10px;
     }
-    .login-logo .logo-mark { width: 56px; height: 56px; }
+    .login-logo .logo-mark { height: 98px; width: auto; object-fit: contain; }
     .login-logo .logo-text {
       font-size: 1.7rem; font-weight: 800; letter-spacing: 3px; line-height: 1; color: #fff;
     }
@@ -144,22 +144,12 @@
     <div class="login-card">
       <div class="login-card-header">
         <div class="login-logo">
-          <svg class="logo-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="emesaGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#e53935"/>
-                <stop offset="100%" stop-color="#b71c1c"/>
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#emesaGrad)"/>
-            <path d="M 18 40 Q 26 22 34 34 T 48 30" stroke="#fff" stroke-width="6"
-                  fill="none" stroke-linecap="round"/>
-          </svg>
+          <img class="logo-mark" src="/static/images/Logo_login.png" alt="EMESA DOCK">
           <span class="logo-text" data-original-text="EMESA">EMESA</span>
           <span class="logo-sub" data-original-text="DOCK">DOCK</span>
         </div>
-        <h1 data-original-text="Crear cuenta">Crear cuenta</h1>
-        <p data-original-text="Regístrate para empezar a gestionar muelles y reservas">Regístrate para empezar a gestionar muelles y reservas</p>
+        <h1 data-original-text="Aceptar invitación">Aceptar invitación</h1>
+        <p data-original-text="Completa tus datos para activar la cuenta autorizada">Completa tus datos para activar la cuenta autorizada</p>
       </div>
 
       <div class="login-card-body">
@@ -180,7 +170,7 @@
             </div>
             <div class="reg-field full">
               <label for="f_password" data-original-text="Contraseña">Contraseña</label>
-              <input type="password" id="f_password" required minlength="6"
+              <input type="password" id="f_password" required minlength="8"
                      placeholder="••••••••" autocomplete="new-password">
             </div>
             <div class="reg-field full">

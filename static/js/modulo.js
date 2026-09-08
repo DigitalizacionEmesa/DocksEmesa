@@ -18,7 +18,6 @@
   let referencias = {};        // id -> { display } por tabla de referencia
   let filasReferencia = {};    // tabla -> filas crudas (para filtrar FK dependientes)
   let editandoId = null;       // id del registro en edición (null = nuevo)
-  let opcionesPorProveedor = {}; // proveedor_id -> Set(ids) para campos 'porProveedor'
   let filtroTexto = '';        // texto del buscador
   let estadoOrden = null;      // { campo, dir } para ordenar (null = orden del servidor)
   let estadoAgrupar = '';      // campo por el que agrupar ('' = sin agrupar)
@@ -244,39 +243,6 @@
   }
 
   // ------------------------------------------------------------------
-  // Campo 'porProveedor': limita sus opciones a las de la API de un padre
-  // (p. ej. en proveedor_muelles, la Planta se limita a las plantas de los
-  // usuarios del proveedor seleccionado, para evitar inconsistencias).
-  // ------------------------------------------------------------------
-  async function cargarOpcionesPorProveedor(campo) {
-    const parentSel = document.getElementById(`f_${campo.porProveedor}`);
-    const provId = parentSel ? parentSel.value : '';
-    const hijo = document.getElementById(`f_${campo.campo}`);
-    if (!hijo) return;
-    if (!provId) {
-      hijo.innerHTML = '<option value="">—</option>';
-      actualizarDependientesDe(campo.campo);
-      return;
-    }
-    try {
-      const url = (campo.opcionesPorProveedorUrl || '') + encodeURIComponent(provId);
-      const data = await SupabaseApp.api(url);
-      const ids = (data.plantas || data.opciones || []).map(p => p.id);
-      opcionesPorProveedor[provId] = new Set(ids);
-      const mapa = referencias[campo.ref.tabla] || {};
-      const opciones = ids.map(id => {
-        const nombre = mapa[id] || id;
-        return `<option value="${id}">${esc(nombre)}</option>`;
-      }).join('');
-      hijo.innerHTML = '<option value="">—</option>' + opciones;
-      actualizarDependientesDe(campo.campo);
-    } catch (e) {
-      console.warn('[Modulo] Error cargando opciones por proveedor:', e);
-      hijo.innerHTML = '<option value="">—</option>';
-    }
-  }
-
-  // ------------------------------------------------------------------
   // Carga de datos
   // ------------------------------------------------------------------
   async function cargarDatos() {
@@ -379,21 +345,86 @@
   // Modal de formulario
   // ------------------------------------------------------------------
   function abrirModal(registro) {
+    if (nombreTabla === 'proveedor_muelles' && !registro) {
+      abrirAsignacionMultiple();
+      return;
+    }
     editandoId = registro ? registro.id : null;
     document.getElementById('crudModalTitulo').textContent =
       registro ? `${t('Editar')}: ${modulo.titulo}` : `${t('Nuevo registro')}: ${modulo.titulo}`;
 
     const form = document.getElementById('crudForm');
+    delete form.dataset.modo;
     form.innerHTML = (modulo.campos || []).map(c => campoHTML(c, registro ? registro[c.campo] : undefined, !registro)).join('');
 
     // Inicializar la cascada de selects dependientes (org -> planta -> ...)
     aplicarDependencias();
 
-    // Inicializar campos 'porProveedor' (opciones restringidas por el padre)
-    (modulo.campos || []).forEach(c => {
-      if (c.porProveedor) cargarOpcionesPorProveedor(c);
-    });
+    document.getElementById('crudModal').classList.add('active');
+  }
 
+  function abrirAsignacionMultiple() {
+    editandoId = null;
+    const form = document.getElementById('crudForm');
+    const proveedores = filasReferencia.proveedores || [];
+    const plantas = filasReferencia.plantas || [];
+    form.dataset.modo = 'asignacion-multiple';
+    document.getElementById('crudModalTitulo').textContent = t('Asignar muelles a proveedor');
+    form.innerHTML = `
+      <div class="crud-field"><label for="pm_proveedor">${t('Proveedor')}</label>
+        <select id="pm_proveedor" required><option value="">—</option>
+          ${proveedores.map(p => `<option value="${p.id}">${esc(p.nombre)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="crud-field"><label for="pm_planta">${t('Planta')}</label>
+        <select id="pm_planta" required><option value="">—</option>
+          ${plantas.map(p => `<option value="${p.id}">${esc(p.nombre)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="crud-field full"><label for="pm_nave">${t('Nave')}</label>
+        <select id="pm_nave" required disabled><option value="">—</option></select>
+      </div>
+      <div class="crud-field full"><label>${t('Muelles')}</label>
+        <div id="pm_muelles" style="border:1.5px solid #d0d7de;border-radius:8px;padding:10px 12px;max-height:230px;overflow-y:auto;color:#5b7893;">${t('Selecciona una nave para ver sus muelles.')}</div>
+      </div>`;
+
+    const proveedorSel = document.getElementById('pm_proveedor');
+    const plantaSel = document.getElementById('pm_planta');
+    const naveSel = document.getElementById('pm_nave');
+    const muellesCont = document.getElementById('pm_muelles');
+
+    function actualizarNaves() {
+      const naves = (filasReferencia.naves || []).filter(n => String(n.planta_id) === String(plantaSel.value));
+      naveSel.disabled = !plantaSel.value;
+      naveSel.innerHTML = '<option value="">—</option>' + naves.map(n => `<option value="${n.id}">${esc(n.nombre)}</option>`).join('');
+      muellesCont.textContent = t('Selecciona una nave para ver sus muelles.');
+    }
+
+    function actualizarMuelles() {
+      const asignados = new Set(registros
+        .filter(r => String(r.proveedor_id) === String(proveedorSel.value))
+        .map(r => String(r.muelle_id)));
+      const muelles = (filasReferencia.muelles || []).filter(m => String(m.nave_id) === String(naveSel.value));
+      if (!naveSel.value) {
+        muellesCont.textContent = t('Selecciona una nave para ver sus muelles.');
+        return;
+      }
+      if (!muelles.length) {
+        muellesCont.textContent = t('No hay muelles en esta nave.');
+        return;
+      }
+      muellesCont.innerHTML = muelles.map(m => {
+        const asignado = asignados.has(String(m.id));
+        return `<label style="display:flex;align-items:center;gap:8px;margin:5px 0;cursor:${asignado ? 'default' : 'pointer'};font-weight:500;">
+          <input type="checkbox" class="pm-muelle" value="${m.id}" ${asignado ? 'checked disabled' : ''}>
+          ${esc(m.nombre)}${asignado ? ` <small style="color:#5b7893;">(${t('ya asignado')})</small>` : ''}
+        </label>`;
+      }).join('');
+    }
+
+    plantaSel.addEventListener('change', actualizarNaves);
+    naveSel.addEventListener('change', actualizarMuelles);
+    proveedorSel.addEventListener('change', actualizarMuelles);
     document.getElementById('crudModal').classList.add('active');
   }
 
@@ -477,6 +508,9 @@
   async function guardar(e) {
     e.preventDefault();
     const form = document.getElementById('crudForm');
+    if (form.dataset.modo === 'asignacion-multiple') {
+      return guardarAsignacionMultiple();
+    }
     const formData = new FormData(form);
     const cuerpo = {};
 
@@ -511,6 +545,30 @@
     } catch (err) {
       console.error('❌ Error guardando:', err);
       notificar(t('Error') + ': ' + mensajeErrorAmigable(err), 'error');
+    }
+  }
+
+  async function guardarAsignacionMultiple() {
+    const proveedorId = document.getElementById('pm_proveedor').value;
+    const muelleIds = [...document.querySelectorAll('.pm-muelle:checked:not(:disabled)')].map(input => input.value);
+    if (!proveedorId || !muelleIds.length) {
+      notificar(t('Selecciona un proveedor y al menos un muelle no asignado.'), 'error');
+      return;
+    }
+    const boton = document.getElementById('crudGuardar');
+    boton.disabled = true;
+    try {
+      const data = await SupabaseApp.api('/api/proveedor-muelles/asignar', {
+        method: 'POST', body: { proveedor_id: proveedorId, muelle_ids: muelleIds }
+      });
+      cerrarModal();
+      await cargarDatos();
+      notificar(`${data.asignados || 0} ${t('muelles asignados')}`, 'success');
+    } catch (err) {
+      console.error('❌ Error asignando muelles:', err);
+      notificar(t('Error') + ': ' + mensajeErrorAmigable(err), 'error');
+    } finally {
+      boton.disabled = false;
     }
   }
 
@@ -677,10 +735,6 @@
       if (!sel || sel.tagName !== 'SELECT') return;
       const campo = (modulo.campos || []).find(c => `f_${c.campo}` === sel.id);
       if (campo) actualizarDependientesDe(campo.campo);
-      // Si el campo cambiado es el padre de un campo 'porProveedor', recargar sus opciones
-      (modulo.campos || []).forEach(c => {
-        if (c.porProveedor && c.porProveedor === campo.campo) cargarOpcionesPorProveedor(c);
-      });
     });
 
     // Clic en el fondo para cerrar

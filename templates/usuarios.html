@@ -9,13 +9,8 @@
   <style>
     .modulo-head {
       width: 100%;
-      max-width: 980px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
+      max-width: 1460px;
+      margin-bottom: 16px;
     }
 
     .modulo-head h1 {
@@ -26,26 +21,35 @@
       align-items: center;
       gap: 10px;
     }
+    .modulo-head p { margin: 5px 0 0 35px; color: #607080; font-size: .93rem; }
 
     .modulo-toolbar {
       width: 100%;
-      max-width: 980px;
-      background: linear-gradient(135deg, #f7fbff 0%, #eef5fc 100%);
-      border: 1px solid #d6e6f4;
-      border-radius: 12px;
-      padding: 12px 14px;
-      box-shadow: 0 2px 10px rgba(25, 118, 210, 0.07);
+      max-width: 1460px;
+      background: #fff;
+      border: 1px solid #e0e7ed;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 3px 14px rgba(29, 56, 80, .07);
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 16px;
       margin-bottom: 14px;
     }
 
     .toolbar-acciones {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
     }
+    .toolbar-acciones h2 { font-size: 1rem; color: #20354a; margin: 0 0 3px; }
+    .toolbar-acciones p { color: #66798a; font-size: .84rem; margin: 0; }
+    .operarios-acceso { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 12px; border-left: 1px solid #dde5eb; }
+    .operarios-acceso small { display: block; color: #728293; font-size: .75rem; }
+    .btn-secundario { background: #f4f7fa; border-color: #d8e1e8; color: #29526e; }
+    .btn-icono { min-width: 38px; padding: 8px 10px; font-size: 1rem; }
 
     .modulo-toolbar .btn { margin: 0; }
     .modulo-toolbar .btn:hover {
@@ -53,18 +57,22 @@
       box-shadow: 0 4px 12px rgba(40, 167, 69, 0.35);
     }
     .modulo-toolbar .btn-exito { box-shadow: 0 2px 8px rgba(40, 167, 69, 0.28); }
+    .filtros-rapidos { display: flex; gap: 4px; flex-wrap: wrap; background: #f3f6f8; padding: 4px; border-radius: 9px; }
+    .filtro-rapido { border: 0; background: transparent; color: #5d6d7b; box-shadow: none; padding: 7px 11px; font-size: .84rem; }
+    .filtro-rapido.activo { background: #fff; color: var(--color-primario-oscuro); border-color: #fff; box-shadow: 0 1px 4px rgba(29, 56, 80, .14); }
 
     .modulo-filtros {
       width: 100%;
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: space-between;
+      gap: 14px;
       flex-wrap: wrap;
     }
 
     .buscador-wrap {
       position: relative;
-      flex: 0 1 300px;
+      flex: 0 1 285px;
       min-width: 190px;
     }
 
@@ -81,7 +89,7 @@
     .buscador-wrap input[type="search"] {
       width: 100%;
       padding-left: 34px;
-      border-radius: 20px;
+      border-radius: 9px;
       margin: 0;
       background: #fff;
       border-color: #d4e2f0;
@@ -94,7 +102,7 @@
 
     .modulo-aviso {
       width: 100%;
-      max-width: 980px;
+      max-width: 1460px;
       margin-bottom: 12px;
       padding: 10px 16px;
       border-radius: 8px;
@@ -105,8 +113,12 @@
     .modulo-aviso.info { background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
     .modulo-aviso.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
 
-    .modulo-panel { width: 100%; max-width: 980px; padding: 20px; overflow-x: auto; }
-    .modulo-panel table { margin-top: 0; }
+    /* Lista corporativa: crece con la pantalla y conserva cada dato completo. */
+    .modulo-panel { width: min(100%, 1460px); max-width: 1460px; padding: 20px; overflow: visible; box-sizing: border-box; }
+    .modulo-panel table { width: 100%; table-layout: auto; margin-top: 0; }
+    .modulo-panel th, .modulo-panel td { white-space: nowrap; overflow: visible; }
+    .modulo-panel th { font-size: .82rem; }
+    .modulo-panel td { font-size: .9rem; vertical-align: middle; }
 
     .acciones-cell { white-space: nowrap; text-align: center; }
     .action-button {
@@ -165,7 +177,31 @@
     .roles-box input[type="checkbox"] { width: auto; transform: scale(1.2); margin: 0; }
 
     .crud-modal-foot { padding: 0 22px 22px 22px; display: flex; justify-content: flex-end; gap: 12px; }
-    @media (max-width: 600px) { .crud-form-grid { grid-template-columns: 1fr; } }
+    .alta-opciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .alta-opcion {
+      text-align: left; border: 1px solid #d6e6f4; border-radius: 12px; background: #f8fbff;
+      padding: 16px; cursor: pointer; color: #17324d; transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+    .alta-opcion:hover { transform: translateY(-2px); border-color: var(--color-primario); box-shadow: 0 5px 15px rgba(25,118,210,.16); }
+    .alta-opcion strong { display: block; font-size: 1rem; margin: 7px 0 5px; }
+    .alta-opcion span { display: block; font-size: .86rem; line-height: 1.35; color: #536575; }
+    .alta-opcion-icono { font-size: 1.55rem; }
+    .acceso-manual { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e4e9ee; color: #5c6c7a; font-size: .86rem; }
+    .acceso-manual .btn { margin-top: 8px; }
+    @media (max-width: 700px) { .alta-opciones { grid-template-columns: 1fr; } .operarios-acceso { border-left: 0; border-top: 1px solid #dde5eb; width: 100%; padding-left: 0; } }
+    @media (max-width: 1180px) {
+      .modulo-panel { padding: 14px; }
+      .modulo-panel th, .modulo-panel td { padding: 8px 7px; font-size: .8rem; }
+    }
+    @media (max-width: 600px) {
+      .crud-form-grid { grid-template-columns: 1fr; }
+      .modulo-head p { margin-left: 0; }
+      .modulo-filtros { align-items: stretch; }
+      .buscador-wrap { flex-basis: 100%; }
+      .modulo-panel { padding: 10px; }
+      .modulo-panel th, .modulo-panel td { padding: 7px 5px; font-size: .74rem; }
+      .action-button { padding: 5px 7px; font-size: .76rem; }
+    }
   </style>
 </head>
 <body>
@@ -179,13 +215,29 @@
   <div class="main-container">
     <div class="modulo-head">
       <h1>👤 <span data-original-text="Usuarios">Usuarios</span></h1>
+      <p data-original-text="Gestiona accesos internos, proveedores y operarios desde un único lugar.">Gestiona accesos internos, proveedores y operarios desde un único lugar.</p>
     </div>
 
     <div class="modulo-toolbar">
       <div class="toolbar-acciones">
-        <button class="btn btn-exito" id="btnNuevo" data-original-text="Nuevo usuario">＋ Nuevo usuario</button>
+        <div>
+          <h2 data-original-text="Accesos">Accesos</h2>
+          <p data-original-text="Crea invitaciones o consulta las cuentas ya activas.">Crea invitaciones o consulta las cuentas ya activas.</p>
+        </div>
+        <button class="btn btn-exito" id="btnAltaAcceso" type="button" data-original-text="＋ Dar acceso">＋ Dar acceso</button>
+        <div class="operarios-acceso">
+          <div><strong data-original-text="Operarios">Operarios</strong><small data-original-text="Sincronización y contraseñas">Sincronización y contraseñas</small></div>
+          <button class="btn btn-secundario" id="btnOperarios" type="button" data-original-text="Gestionar">Gestionar</button>
+          <button class="btn btn-secundario btn-icono" id="btnSincronizarOperarios" type="button" title="Sincronizar operarios" data-original-title="Sincronizar operarios" aria-label="Sincronizar operarios">↻</button>
+        </div>
       </div>
       <div class="modulo-filtros">
+        <div class="filtros-rapidos" aria-label="Filtrar usuarios" data-original-aria-label="Filtrar usuarios">
+          <button class="btn filtro-rapido activo" type="button" data-filtro="todos" data-original-text="Todos">Todos</button>
+          <button class="btn filtro-rapido" type="button" data-filtro="externos" data-original-text="Externos">Externos</button>
+          <button class="btn filtro-rapido" type="button" data-filtro="internos" data-original-text="Internos">Internos</button>
+          <button class="btn filtro-rapido" type="button" data-filtro="operarios" data-original-text="Operarios">Operarios</button>
+        </div>
         <div class="buscador-wrap">
           <span class="buscador-icono">🔍</span>
           <input type="search" id="busqueda" placeholder="Buscar..." data-original-placeholder="Buscar...">
@@ -194,6 +246,7 @@
     </div>
 
     <div id="moduloAviso" class="modulo-aviso" style="display:none;"></div>
+    <div id="estadoSincronizacion" class="modulo-aviso" style="display:none;"></div>
 
     <div class="panel modulo-panel">
       <table>
@@ -206,7 +259,37 @@
 
     <div class="footer-info">
       <p data-original-text="EMESA DOCK · Gestión de usuarios">EMESA DOCK · Gestión de usuarios</p>
-      <p data-original-text="Los usuarios se crean con login propio (Supabase Auth) desde la aplicación">Los usuarios se crean con login propio (Supabase Auth) desde la aplicación</p>
+      <p data-original-text="Los accesos internos y externos se conceden por invitación; los operarios se gestionan desde la sincronización corporativa.">Los accesos internos y externos se conceden por invitación; los operarios se gestionan desde la sincronización corporativa.</p>
+    </div>
+  </div>
+
+  <div class="crud-modal-overlay" id="altaAccesoModal">
+    <div class="crud-modal" style="max-width:820px;">
+      <div class="crud-modal-head">
+        <h3 data-original-text="Dar acceso">Dar acceso</h3>
+        <button class="crud-modal-close" id="altaAccesoModalClose" title="Cerrar" data-original-title="Cerrar">✕</button>
+      </div>
+      <div class="crud-modal-body">
+        <p style="margin-top:0;" data-original-text="Selecciona el origen de la persona. Cada opción usa el flujo adecuado y evita crear cuentas sin contexto.">Selecciona el origen de la persona. Cada opción usa el flujo adecuado y evita crear cuentas sin contexto.</p>
+        <div class="alta-opciones">
+          <button type="button" class="alta-opcion" id="altaInterno">
+            <span class="alta-opcion-icono">🏢</span><strong data-original-text="Usuario interno">Usuario interno</strong>
+            <span data-original-text="Envía una invitación. Después se configura su rol, departamento y plantas permitidas.">Envía una invitación. Después se configura su rol, departamento y plantas permitidas.</span>
+          </button>
+          <button type="button" class="alta-opcion" id="altaExterno">
+            <span class="alta-opcion-icono">🚚</span><strong data-original-text="Proveedor externo">Proveedor externo</strong>
+            <span data-original-text="Envía una invitación vinculada a un proveedor. Su acceso se determina por sus muelles autorizados.">Envía una invitación vinculada a un proveedor. Su acceso se determina por sus muelles autorizados.</span>
+          </button>
+          <button type="button" class="alta-opcion" id="altaOperario">
+            <span class="alta-opcion-icono">👷</span><strong data-original-text="Operario interno">Operario interno</strong>
+            <span data-original-text="Gestiona una identidad ya sincronizada desde el sistema corporativo y crea su cuenta cuando corresponda.">Gestiona una identidad ya sincronizada desde el sistema corporativo y crea su cuenta cuando corresponda.</span>
+          </button>
+        </div>
+        <div class="acceso-manual">
+          <span data-original-text="Para incidencias excepcionales, un administrador puede crear una cuenta manual con contraseña temporal.">Para incidencias excepcionales, un administrador puede crear una cuenta manual con contraseña temporal.</span>
+          <br><button class="btn" id="btnNuevo" type="button" data-original-text="Crear cuenta manual">Crear cuenta manual</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -223,6 +306,61 @@
       <div class="crud-modal-foot">
         <button type="button" class="btn" id="crudCancelar" data-original-text="Cancelar">Cancelar</button>
         <button type="submit" form="crudForm" class="btn btn-exito" id="crudGuardar" data-original-text="Guardar">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="crud-modal-overlay" id="invitacionModal">
+    <div class="crud-modal">
+      <div class="crud-modal-head">
+        <h3 id="invitacionModalTitulo" data-original-text="Enviar invitación">Enviar invitación</h3>
+        <button class="crud-modal-close" id="invitacionModalClose" title="Cerrar" data-original-title="Cerrar">✕</button>
+      </div>
+      <div class="crud-modal-body">
+        <form id="invitacionForm" class="crud-form-grid"></form>
+      </div>
+      <div class="crud-modal-foot">
+        <button type="button" class="btn" id="invitacionCancelar" data-original-text="Cancelar">Cancelar</button>
+        <button type="submit" form="invitacionForm" class="btn btn-exito" id="invitacionEnviar" data-original-text="Enviar invitación">Enviar invitación</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="crud-modal-overlay" id="operariosModal">
+    <div class="crud-modal" style="max-width:960px;">
+      <div class="crud-modal-head">
+        <h3 data-original-text="Operarios sincronizados">Operarios sincronizados</h3>
+        <button class="crud-modal-close" id="operariosModalClose" title="Cerrar" data-original-title="Cerrar">✕</button>
+      </div>
+      <div class="crud-modal-body" style="overflow:auto;max-height:62vh;">
+        <table>
+          <thead><tr><th data-original-text="Número">Número</th><th data-original-text="Nombre">Nombre</th><th data-original-text="Estado">Estado</th><th data-original-text="Cuenta">Cuenta</th><th data-original-text="Acciones">Acciones</th></tr></thead>
+          <tbody id="operariosTbody"><tr><td colspan="5" class="empty-state">Cargando...</td></tr></tbody>
+        </table>
+        <div class="buscador-wrap" style="margin-top:16px;">
+          <span class="buscador-icono">🔍</span>
+          <input type="search" id="busquedaOperarios" placeholder="Buscar por número o nombre..." data-original-placeholder="Buscar por número o nombre...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="crud-modal-overlay" id="credencialOperarioModal">
+    <div class="crud-modal" style="max-width:500px;">
+      <div class="crud-modal-head">
+        <h3 id="credencialOperarioTitulo" data-original-text="Cuenta de operario">Cuenta de operario</h3>
+        <button class="crud-modal-close" id="credencialOperarioClose" title="Cerrar" data-original-title="Cerrar">✕</button>
+      </div>
+      <div class="crud-modal-body">
+        <form id="credencialOperarioForm">
+          <p id="credencialOperarioTexto" style="margin-top:0;"></p>
+          <label for="credencialOperarioPassword" data-original-text="Contraseña">Contraseña</label>
+          <input type="password" id="credencialOperarioPassword" required autocomplete="new-password" style="width:100%;box-sizing:border-box;">
+        </form>
+      </div>
+      <div class="crud-modal-foot">
+        <button type="button" class="btn" id="credencialOperarioCancelar" data-original-text="Cancelar">Cancelar</button>
+        <button type="submit" form="credencialOperarioForm" class="btn btn-exito" id="credencialOperarioGuardar" data-original-text="Guardar">Guardar</button>
       </div>
     </div>
   </div>

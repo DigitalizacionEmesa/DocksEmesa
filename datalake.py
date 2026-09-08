@@ -36,12 +36,19 @@ def _conexion():
     ultimo_error = None
     for driver in drivers:
         for server in servers:
+            # El driver legado "SQL Server" no admite los atributos Encrypt ni
+            # TrustServerCertificate. ODBC 18 sí; en ese caso el cifrado se
+            # controla explícitamente desde el entorno.
+            seguridad = ""
+            if driver.lower().startswith("odbc driver"):
+                cifrado = "yes" if config.DATALAKE_ENCRYPT not in ("no", "false", "0") else "no"
+                seguridad = f"Encrypt={cifrado};TrustServerCertificate=yes;"
             conn_str = (
                 f"DRIVER={{{driver}}};"
                 f"SERVER={server};"
                 f"DATABASE={config.DATALAKE_DATABASE};"
                 f"UID={config.DATALAKE_USER};PWD={config.DATALAKE_PASSWORD};"
-                "Encrypt=yes;TrustServerCertificate=yes;Connection Timeout=10;"
+                f"{seguridad}Connection Timeout=10;"
             )
             try:
                 return pyodbc.connect(conn_str, timeout=10, autocommit=True)
@@ -130,5 +137,34 @@ def buscar_operario(num_operario, password):
             }
 
         return None
+    finally:
+        conn.close()
+
+
+def listar_operarios():
+    """Devuelve los datos de identidad necesarios para la sincronización.
+
+    No lee ni transmite contraseñas. General.Usuarios es el origen preferido;
+    si no está disponible, se propaga el error para que la ejecución quede
+    registrada como fallida y pueda revisarse.
+    """
+    conn = _conexion()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT Num_Operario, Nombre, Correo FROM General.Usuarios "
+            "WHERE Num_Operario IS NOT NULL"
+        )
+        return [
+            {
+                "numero_operario": str(fila[0]).strip(),
+                "nombre": fila[1],
+                "correo": fila[2],
+                "activo": True,
+                "origen": "EMESA",
+            }
+            for fila in cursor.fetchall()
+            if fila[0] is not None and fila[1]
+        ]
     finally:
         conn.close()

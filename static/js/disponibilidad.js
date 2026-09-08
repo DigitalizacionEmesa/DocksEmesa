@@ -18,7 +18,7 @@
     { v: 4, l: 'V' }, { v: 5, l: 'S' }, { v: 6, l: 'D' }
   ];
 
-  var muelles = [];        // lista de muelles para el select
+  var muelles = [];        // lista de muelles para el selector múltiple
   var registros = [];      // filas crudas de disponibilidad_muelles
   var grupos = [];         // registros agrupados para el listado
   var editando = null;     // grupo en edicion
@@ -68,8 +68,24 @@
   // ------------------------------------------------------------------
   async function cargarMuelles() {
     try {
-      var data = await SupabaseApp.api('/api/crud/muelles?limit=500');
-      muelles = data.datos || [];
+      var datos = await Promise.all([
+        SupabaseApp.api('/api/crud/muelles?limit=500'),
+        SupabaseApp.api('/api/crud/naves?limit=500'),
+        SupabaseApp.api('/api/crud/plantas?limit=200')
+      ]);
+      var naves = datos[1].datos || [];
+      var plantas = datos[2].datos || [];
+      var porNave = {};
+      var porPlanta = {};
+      naves.forEach(function(n) { porNave[n.id] = n; });
+      plantas.forEach(function(p) { porPlanta[p.id] = p; });
+      muelles = (datos[0].datos || []).map(function(m) {
+        var nave = porNave[m.nave_id] || {};
+        var planta = porPlanta[nave.planta_id] || {};
+        return Object.assign({}, m, {
+          etiqueta: [planta.nombre, nave.nombre, m.nombre].filter(Boolean).join(' · ')
+        });
+      });
     } catch (e) {
       muelles = [];
       console.error('Error cargando muelles:', e);
@@ -78,7 +94,7 @@
 
   function nombreMuelle(id) {
     var m = muelles.find(function (x) { return x.id === id; });
-    return m ? m.nombre : id;
+    return m ? (m.etiqueta || m.nombre) : id;
   }
 
   async function cargarRegistros() {
@@ -171,22 +187,44 @@
     return Array.prototype.slice.call(document.querySelectorAll('#diasBox input:checked')).map(function (c) { return parseInt(c.value, 10); });
   }
 
+  function muellesMarcados() {
+    var select = document.getElementById('f_muelle_id');
+    return Array.prototype.slice.call(select.selectedOptions).map(function(o) { return o.value; }).filter(Boolean);
+  }
+
+  function aplicarModo() {
+    var modo = document.getElementById('f_modo').value;
+    var limpiar = modo === 'limpiar';
+    document.getElementById('f_hora_inicio').disabled = limpiar;
+    document.getElementById('f_hora_fin').disabled = limpiar;
+    document.getElementById('f_activo').disabled = limpiar;
+    document.getElementById('f_ayuda_modo').textContent = limpiar
+      ? t('Deja los muelles y días elegidos sin disponibilidad periódica. Las excepciones por fecha no se modifican.')
+      : modo === 'reemplazar'
+        ? t('Sustituye todas las franjas periódicas de los muelles y días elegidos por esta franja.')
+        : t('Añade esta franja sin borrar otras. No se permiten solapamientos.');
+  }
+
   function abrirModal(grupo) {
     editando = grupo || null;
-    document.getElementById('crudModalTitulo').textContent = grupo ? t('Editar horario') : t('Nuevo horario');
+    document.getElementById('crudModalTitulo').textContent = grupo ? t('Editar horario') : t('Configurar disponibilidad');
 
     // Muelle select
     var mSel = document.getElementById('f_muelle_id');
-    mSel.innerHTML = '<option value="">\u2014 ' + t('Selecciona un muelle') + ' \u2014</option>'
-      + muelles.map(function (m) {
-        return '<option value="' + m.id + '"' + (grupo && grupo.muelle_id === m.id ? ' selected' : '') + '>' + esc(m.nombre) + '</option>';
-      }).join('');
+    mSel.innerHTML = muelles.map(function (m) {
+      return '<option value="' + m.id + '"' + (grupo && grupo.muelle_id === m.id ? ' selected' : '') + '>' + esc(m.etiqueta || m.nombre) + '</option>';
+    }).join('');
+    mSel.disabled = !!grupo;
 
     pintarCheckboxes(grupo ? grupo.dias.slice() : []);
     document.getElementById('f_hora_inicio').value = grupo ? grupo.hora_inicio : '';
     document.getElementById('f_hora_fin').value = grupo ? grupo.hora_fin : '';
     document.getElementById('f_activo').checked = grupo ? grupo.activo : true;
     document.getElementById('f_id').value = grupo ? grupo.ids[0] : '';
+    var modo = document.getElementById('f_modo');
+    modo.value = grupo ? 'editar' : 'agregar';
+    document.getElementById('f_modo_wrap').style.display = grupo ? 'none' : 'block';
+    aplicarModo();
 
     document.getElementById('crudModal').classList.add('active');
     if (window.GlobalHeader) window.GlobalHeader.translatePage();
@@ -198,39 +236,44 @@
   }
 
   // ------------------------------------------------------------------
-  // Guardar: borra el grupo y crea un registro por dia marcado
+  // Guardar: permite añadir franjas, sustituir un horario semanal, limpiar
+  // días o editar únicamente el grupo seleccionado.
   // ------------------------------------------------------------------
   async function guardar(e) {
     e.preventDefault();
-    var muelleId = document.getElementById('f_muelle_id').value;
+    var muelleIds = muellesMarcados();
     var dias = diasMarcados();
-    if (!muelleId) { notificar(t('Selecciona un muelle.'), 'error'); return; }
+    if (!muelleIds.length) { notificar(t('Selecciona al menos un muelle.'), 'error'); return; }
     if (!dias.length) { notificar(t('Marca al menos un dia.'), 'error'); return; }
+    var modo = editando ? 'editar' : document.getElementById('f_modo').value;
     var horaInicio = document.getElementById('f_hora_inicio').value;
     var horaFin = document.getElementById('f_hora_fin').value;
     var activo = document.getElementById('f_activo').checked;
-    if (!horaInicio || !horaFin) { notificar(t('Indica hora de inicio y fin.'), 'error'); return; }
-    if (horaInicio >= horaFin) { notificar(t('La hora de fin debe ser posterior al inicio.'), 'error'); return; }
+    if (modo !== 'limpiar') {
+      if (!horaInicio || !horaFin) { notificar(t('Indica hora de inicio y fin.'), 'error'); return; }
+      if (horaInicio >= horaFin) { notificar(t('La hora de fin debe ser posterior al inicio.'), 'error'); return; }
+    }
 
     var btn = document.getElementById('crudGuardar');
     btn.disabled = true;
     try {
-      // Si editando, borrar todas las filas del grupo
-      if (editando) {
-        for (var i = 0; i < editando.ids.length; i++) {
-          await SupabaseApp.api('/api/crud/disponibilidad_muelles/' + editando.ids[i], { method: 'DELETE' });
+      var respuesta = await SupabaseApp.api('/api/disponibilidad-muelles/configurar', {
+        method: 'POST',
+        body: {
+          muelle_ids: muelleIds,
+          dias: dias,
+          hora_inicio: horaInicio,
+          hora_fin: horaFin,
+          activo: activo,
+          modo: modo,
+          eliminar_ids: editando ? editando.ids : []
         }
-      }
-      // Insertar un registro por dia marcado
-      for (var j = 0; j < dias.length; j++) {
-        await SupabaseApp.api('/api/crud/disponibilidad_muelles', {
-          method: 'POST',
-          body: { muelle_id: muelleId, dia_semana: dias[j], hora_inicio: horaInicio, hora_fin: horaFin, activo: activo }
-        });
-      }
+      });
       cerrarModal();
       await cargarRegistros();
-      notificar(t('Operacion completada'), 'success');
+      notificar(modo === 'limpiar'
+        ? t('Disponibilidad periódica eliminada')
+        : (respuesta.creados || 0) + ' ' + t('franjas configuradas'), 'success');
     } catch (err) {
       console.error('Error guardando:', err);
       notificar(t('Error') + ': ' + mensajeErrorAmigable(err), 'error');
@@ -289,6 +332,7 @@
     document.getElementById('crudModalClose').addEventListener('click', cerrarModal);
     document.getElementById('crudCancelar').addEventListener('click', cerrarModal);
     document.getElementById('crudForm').addEventListener('submit', guardar);
+    document.getElementById('f_modo').addEventListener('change', aplicarModo);
     document.getElementById('busqueda').addEventListener('input', function (ev) { filtrar(ev.target.value); });
     document.getElementById('crudModal').addEventListener('click', function (ev) {
       if (ev.target.id === 'crudModal') cerrarModal();

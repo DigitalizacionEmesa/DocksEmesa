@@ -60,8 +60,9 @@
     }
 
     .login-logo .logo-mark {
-      width: 64px;
-      height: 64px;
+      height: 98px;
+      width: auto;
+      object-fit: contain;
     }
 
     .login-logo .logo-text {
@@ -257,18 +258,7 @@
       <!-- Cabecera con marca EMESA -->
       <div class="login-card-header">
         <div class="login-logo">
-          <!-- Emblema EMESA (swoosh rojo) -->
-          <svg class="logo-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="emesaGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#e53935"/>
-                <stop offset="100%" stop-color="#b71c1c"/>
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#emesaGrad)"/>
-            <path d="M 18 40 Q 26 22 34 34 T 48 30" stroke="#fff" stroke-width="6"
-                  fill="none" stroke-linecap="round"/>
-          </svg>
+          <img class="logo-mark" src="/static/images/Logo_login.png" alt="EMESA DOCK">
           <span class="logo-text" data-original-text="EMESA">EMESA</span>
           <span class="logo-sub" data-original-text="DOCK">DOCK</span>
         </div>
@@ -292,19 +282,22 @@
             <input type="password" id="password" name="password"
                    placeholder="••••••••"
                    data-original-placeholder="••••••••"
-                   required autocomplete="current-password">
+                   autocomplete="current-password">
           </div>
 
           <div id="passwordSetup" class="password-setup" aria-live="polite">
-            <p>Este usuario no tiene contraseña configurada. Crea una para poder acceder.</p>
+            <p id="passwordSetupText">Debes cambiar la contraseña temporal antes de continuar.</p>
             <div class="login-field">
-              <label for="newPassword">Nueva contraseña</label>
-              <input type="password" id="newPassword" autocomplete="new-password" placeholder="Nueva contraseña">
+              <label for="newPassword" data-original-text="Nueva contraseña">Nueva contraseña</label>
+              <input type="password" id="newPassword" autocomplete="new-password" placeholder="Nueva contraseña" data-original-placeholder="Nueva contraseña">
             </div>
             <div class="login-field" style="margin-bottom: 0;">
-              <label for="confirmPassword">Confirmar contraseña</label>
-              <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Repite la contraseña">
+              <label for="confirmPassword" data-original-text="Confirmar contraseña">Confirmar contraseña</label>
+              <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Repite la contraseña" data-original-placeholder="Repite la contraseña">
             </div>
+            <button type="button" class="login-btn" id="savePasswordBtn" style="margin-top: 14px;">
+              Guardar contraseña
+            </button>
           </div>
 
           <div id="loginMessage" class="login-message"></div>
@@ -345,12 +338,6 @@
     // LOGIN - EMESA DOCK
     // ====================================================================
     document.addEventListener('DOMContentLoaded', () => {
-      // Si ya hay sesión, ir directo al dashboard
-      if (window.Auth && Auth.isAuthenticated()) {
-        window.location.href = '/dashboard';
-        return;
-      }
-
       // Inicializar selector de idioma
       initLoginLanguage();
 
@@ -361,9 +348,11 @@
       const passwordSetup = document.getElementById('passwordSetup');
       const newPasswordInput = document.getElementById('newPassword');
       const confirmPasswordInput = document.getElementById('confirmPassword');
+      const savePasswordBtn = document.getElementById('savePasswordBtn');
       const btn = document.getElementById('loginBtn');
       const btnText = btn.querySelector('.login-btn-text');
       const spinner = btn.querySelector('.login-spinner');
+      let cambioTemporalPendiente = false;
 
       const t = (key) => (window.GlobalHeader && window.GlobalHeader.translate)
                          ? window.GlobalHeader.translate(key) : key;
@@ -380,11 +369,70 @@
         messageDiv.className = 'login-message';
       }
 
-      function mostrarConfiguracionContrasena() {
+      function mostrarConfiguracionContrasena(esCambioTemporal) {
+        cambioTemporalPendiente = !!esCambioTemporal;
         passwordSetup.style.display = 'block';
         passwordInput.value = '';
         passwordInput.required = false;
+        document.getElementById('passwordSetupText').textContent = cambioTemporalPendiente
+          ? 'Debes cambiar la contraseña temporal antes de continuar.'
+          : 'Este usuario no tiene contraseña configurada. Crea una para poder acceder.';
         newPasswordInput.focus();
+      }
+
+      async function guardarPrimeraContrasena() {
+        const numeroOperario = emailInput.value.trim();
+        const passwordNueva = newPasswordInput.value;
+        const confirmacion = confirmPasswordInput.value;
+        if (!numeroOperario || numeroOperario.includes('@')) {
+          showMessage('Indica primero el número de operario.');
+          return false;
+        }
+        if (!passwordNueva || !confirmacion) {
+          showMessage('Completa y confirma la contraseña.');
+          return false;
+        }
+        if (passwordNueva !== confirmacion) {
+          showMessage('Las contraseñas no coinciden.');
+          return false;
+        }
+        await SupabaseApp.api('/operarios/configurar-contrasena', {
+          method: 'POST',
+          body: {
+            numero_operario: numeroOperario,
+            password: passwordNueva,
+            confirmacion: confirmacion
+          }
+        });
+        passwordInput.value = passwordNueva;
+        passwordSetup.style.display = 'none';
+        showMessage('Contraseña guardada. Pulsa «Entrar» para acceder.', 'success');
+        return true;
+      }
+
+      savePasswordBtn.addEventListener('click', async () => {
+        savePasswordBtn.disabled = true;
+        clearMessage();
+        try {
+          await guardarPrimeraContrasena();
+        } catch (err) {
+          showMessage(err.message || 'No se pudo guardar la contraseña.');
+        } finally {
+          savePasswordBtn.disabled = false;
+        }
+      });
+
+      // Una sesión de operario marcada con contraseña temporal no puede entrar
+      // al panel hasta completar el cambio.
+      const sesionExistente = window.Auth && Auth.getCurrentUser ? Auth.getCurrentUser() : null;
+      if (sesionExistente) {
+        if (sesionExistente.requiere_cambio_password) {
+          mostrarConfiguracionContrasena(true);
+          showMessage('Debes cambiar la contraseña temporal antes de continuar.', 'success');
+        } else {
+          window.location.href = '/dashboard';
+          return;
+        }
       }
 
       // Si venimos de completar el registro, mostrar aviso
@@ -411,7 +459,7 @@
         const esOperario = email && !email.includes('@');
         const configurandoContrasena = passwordSetup.style.display === 'block';
 
-        if (!email || (!esOperario && !password)) {
+        if (!cambioTemporalPendiente && (!email || (!esOperario && !password))) {
           showMessage(t('Por favor, complete todos los campos.'));
           if (!email) emailInput.classList.add('error');
           if (!password && !esOperario) passwordInput.classList.add('error');
@@ -437,19 +485,30 @@
 
         try {
           if (configurandoContrasena) {
-            await SupabaseApp.api('/operarios/configurar-contrasena', {
-              method: 'POST',
-              body: {
-                numero_operario: email,
-                password: newPasswordInput.value,
-                confirmacion: confirmPasswordInput.value
+            if (cambioTemporalPendiente) {
+              await SupabaseApp.api('/api/mi-cuenta/cambiar-contrasena', {
+                method: 'POST',
+                body: { password: newPasswordInput.value }
+              });
+              const actual = Auth.getCurrentUser();
+              if (actual) {
+                actual.requiere_cambio_password = false;
+                Auth.setCurrentUser(actual);
               }
-            });
-            passwordInput.value = newPasswordInput.value;
-            password = newPasswordInput.value;
+              showMessage('Contraseña actualizada.', 'success');
+              setTimeout(() => { window.location.href = '/dashboard'; }, 500);
+              return;
+            }
+            await guardarPrimeraContrasena();
+            return;
           }
           const user = await Auth.login(email, password);
           if (user) {
+            if (user.requiere_cambio_password) {
+              mostrarConfiguracionContrasena(true);
+              showMessage('Debes cambiar la contraseña temporal antes de continuar.', 'success');
+              return;
+            }
             showMessage(t('¡Bienvenido') + ', ' + (user.nombre || email) + '!', 'success');
             setTimeout(() => { window.location.href = '/dashboard'; }, 800);
           }

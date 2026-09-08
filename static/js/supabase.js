@@ -37,7 +37,17 @@ const SupabaseApp = (function () {
   // Si no hay anonKey configurada, devuelve null (usa la API del backend).
   async function getClient() {
     if (client) return client;
-    if (!SUPABASE_CONFIG.anonKey) return null;
+    if (!SUPABASE_CONFIG.anonKey) {
+      try {
+        const response = await fetch('/api/configuracion-publica/auth');
+        const config = await response.json();
+        if (!response.ok || !config.anon_key) return null;
+        SUPABASE_CONFIG.url = config.url;
+        SUPABASE_CONFIG.anonKey = config.anon_key;
+      } catch (e) {
+        return null;
+      }
+    }
 
     await loadSdk();
     client = window.supabase.createClient(

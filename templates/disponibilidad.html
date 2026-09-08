@@ -165,18 +165,28 @@
   <div class="crud-modal-overlay" id="crudModal">
     <div class="crud-modal">
       <div class="crud-modal-head">
-        <h3 id="crudModalTitulo">Nuevo horario</h3>
+        <h3 id="crudModalTitulo" data-original-text="Nuevo horario">Nuevo horario</h3>
         <button class="crud-modal-close" id="crudModalClose" title="Cerrar" data-original-title="Cerrar">✕</button>
       </div>
       <div class="crud-modal-body">
         <form id="crudForm" class="crud-form-grid">
           <div class="crud-field full">
-            <label data-original-text="Muelle">Muelle</label>
-            <select id="f_muelle_id" required></select>
+            <label data-original-text="Muelles">Muelles</label>
+            <select id="f_muelle_id" multiple size="7" required></select>
+            <small style="color:#5b7893;display:block;margin:-8px 0 10px 0;">Mantén Ctrl o Cmd para seleccionar varios muelles.</small>
           </div>
           <div class="crud-field full">
             <label data-original-text="Dias de la semana (marca varios)">Dias de la semana (marca varios)</label>
             <div class="dias-box" id="diasBox"></div>
+          </div>
+          <div class="crud-field full" id="f_modo_wrap">
+            <label data-original-text="Operación">Operación</label>
+            <select id="f_modo">
+              <option value="agregar">Añadir franja</option>
+              <option value="reemplazar">Reemplazar horario de los días elegidos</option>
+              <option value="limpiar">Dejar los días sin disponibilidad</option>
+            </select>
+            <small id="f_ayuda_modo" style="color:#5b7893;display:block;margin:-8px 0 10px 0;"></small>
           </div>
           <div class="crud-field">
             <label data-original-text="Hora inicio">Hora inicio</label>

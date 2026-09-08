@@ -1,12 +1,14 @@
+import os
+
 from supabase import create_client
 
 
-url = "https://aeqvtjenbnhglhuchokw.supabase.co"
-key = "sb_secret_n8E2Un5frdLYqyQn5KKjCA_z2uXszUd"
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+if not url or not key:
+    raise SystemExit("Faltan SUPABASE_URL o SUPABASE_KEY en el entorno.")
 
-
-
-supabase = create_client(url,key)
+supabase = create_client(url, key)
 
 
 

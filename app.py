@@ -1,6 +1,8 @@
 import logging
 import os
 import hashlib
+import re
+import threading
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, render_template, request, jsonify, session
@@ -8,12 +10,21 @@ from flask import Flask, render_template, request, jsonify, session
 from supabase import create_client
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from config import SUPABASE_URL, SUPABASE_KEY, DATALAKE_ENABLED
+from config import (
+    APP_URL,
+    DATALAKE_ENABLED,
+    SUPABASE_ANON_KEY,
+    SUPABASE_KEY,
+    SUPABASE_URL,
+)
+from datalake import listar_operarios
+from operarios_sync import ejecutar_sincronizacion
 
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-secreta-dockemesa-dev")
 logger = logging.getLogger(__name__)
+_bloqueo_sincronizacion_operarios = threading.Lock()
 
 
 # Cliente Supabase (service role)
@@ -73,6 +84,13 @@ PERMISOS_POR_ROL = {
     "externo": PERMISOS_PROVEEDOR,  # alias si el rol se llama 'externo'
 }
 
+ROLES_EXTERNOS = frozenset({"proveedor", "externo", "supplier", "supplier_user", "external"})
+
+
+def _es_rol_externo(nombre_rol):
+    """Reconoce los nombres históricos y actuales de los roles de proveedor."""
+    return str(nombre_rol or "").strip().casefold() in ROLES_EXTERNOS
+
 
 def permisos_de_roles(roles):
     """Une los permisos base con los de cada rol del usuario."""
@@ -111,11 +129,11 @@ def obtener_rol_usuario(cliente, user_id):
 
 
 def obtener_plantas_usuario(cliente, user_id):
-    """Plantas visibles (compatible esquema antiguo y nuevo).
+    """Plantas visibles para la sesión.
 
-    - admin / interno -> todas
-    - externo / proveedor -> sus plantas de usuario_plantas (el muelle que use
-      debe estar dentro de esas plantas; se valida en configuracion).
+    El alcance interno se conserva en ``usuario_plantas``. Para proveedores,
+    la planta no es una segunda autorización: se deduce de los muelles que el
+    proveedor tiene asignados. Así no hay configuraciones contradictorias.
     """
     nombre_rol, _ = _obtener_nombre_rol(cliente, user_id)
     if not nombre_rol:
@@ -126,7 +144,11 @@ def obtener_plantas_usuario(cliente, user_id):
             return [p["id"] for p in (todas or [])]
         except Exception:
             pass
-    # usuario_plantas
+    proveedor_id = obtener_proveedor_usuario(cliente, user_id)
+    if nombre_rol in ("proveedor", "externo"):
+        return list(_plantas_de_proveedor(proveedor_id, cliente)) if proveedor_id else []
+
+    # Usuarios internos con alcance limitado.
     try:
         asignadas = (
             cliente.table("usuario_plantas")
@@ -160,6 +182,34 @@ def obtener_proveedor_usuario(cliente, user_id):
     return None
 
 
+def _validar_vinculo_proveedor(datos, usuario_id=None):
+    """Evita perfiles externos sin proveedor.
+
+    Un usuario proveedor obtiene su alcance de ``proveedor_muelles``; sin el
+    vínculo al proveedor no existe una configuración operativa válida.
+    """
+    actuales = {}
+    if usuario_id:
+        try:
+            actuales = (supabase.table("usuarios").select("rol_id,proveedor_id")
+                        .eq("id", usuario_id).single().execute().data or {})
+        except Exception:
+            return "No se pudo comprobar la configuración actual del usuario."
+
+    rol_id = datos.get("rol_id", actuales.get("rol_id"))
+    proveedor_id = datos["proveedor_id"] if "proveedor_id" in datos else actuales.get("proveedor_id")
+    if not rol_id:
+        return None
+    try:
+        rol = supabase.table("roles").select("nombre").eq("id", rol_id).single().execute().data
+        nombre = str((rol or {}).get("nombre") or "").lower()
+    except Exception:
+        return "No se pudo comprobar el rol del usuario."
+    if _es_rol_externo(nombre) and not proveedor_id:
+        return "Un usuario proveedor debe estar vinculado a un proveedor."
+    return None
+
+
 def enriquecer_usuario(cliente, user):
     """Anade roles, permisos y accesos al objeto de usuario."""
     user["roles"] = obtener_rol_usuario(cliente, user["id"])
@@ -167,6 +217,55 @@ def enriquecer_usuario(cliente, user):
     user["plantas"] = obtener_plantas_usuario(cliente, user["id"])
     user["proveedor_id"] = obtener_proveedor_usuario(cliente, user["id"])
     return user
+
+
+def usuario_actual_es_administrador():
+    """Comprueba el rol guardado en la sesión de Flask.
+
+    Los endpoints nuevos no aceptan un rol enviado por el navegador: únicamente
+    se usa el perfil creado en el login de Supabase.
+    """
+    usuario = session.get("user") or {}
+    roles = {str(rol).upper() for rol in (usuario.get("roles") or [])}
+    if usuario.get("rol"):
+        roles.add(str(usuario["rol"]).upper())
+    return bool(roles & {"ADMIN", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"})
+
+
+def usuario_actual_puede_configurar():
+    """Indica si la sesión puede gestionar la configuración operativa.
+
+    La configuración de plantas, naves, muelles, horarios, excepciones y
+    asignaciones de proveedores es responsabilidad de personal interno. La
+    administración de usuarios y roles sigue reservada a administradores.
+    """
+    usuario = session.get("user") or {}
+    roles = {str(rol).upper() for rol in (usuario.get("roles") or [])}
+    if usuario.get("rol"):
+        roles.add(str(usuario["rol"]).upper())
+    return bool(roles & {
+        "ADMIN", "INTERNO", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"
+    })
+
+
+def _email_tecnico_operario(numero_operario):
+    """Genera una identidad de Auth válida que no depende de un buzón real."""
+    identificador = re.sub(r"[^a-z0-9._-]", "-", str(numero_operario).strip().lower())
+    if not identificador:
+        raise ValueError("El número de operario no es válido.")
+    return f"operario.{identificador}@usuarios.docksemesa.invalid"
+
+
+def _rol_operario_por_defecto():
+    """Obtiene un rol operativo seguro, sin inferir privilegios de metadatos."""
+    for nombre in ("PLANT_OPERATOR", "interno"):
+        try:
+            filas = supabase.table("roles").select("id,nombre").eq("nombre", nombre).limit(1).execute().data
+            if filas:
+                return filas[0]
+        except Exception:
+            continue
+    return None
 
 
 @app.route("/")
@@ -177,6 +276,14 @@ def login_page():
 @app.route("/registro")
 def registro_page():
     return render_template("registro.html")
+
+
+@app.route("/api/configuracion-publica/auth")
+def api_configuracion_publica_auth():
+    """Expone únicamente la clave pública necesaria para aceptar invitaciones."""
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        return jsonify({"error": "La aceptación de invitaciones no está configurada."}), 503
+    return jsonify({"url": SUPABASE_URL, "anon_key": SUPABASE_ANON_KEY})
 
 
 @app.route("/dashboard")
@@ -190,8 +297,8 @@ def login():
     usuario = (datos.get("email") or datos.get("usuario") or "").strip()
     password = datos.get("password") or ""
 
-    # Correo electrónico -> Supabase Auth. Número de operario -> copia segura
-    # de credenciales corporativas importada en Supabase.
+    # Correo electrónico -> Supabase Auth. Los operarios siempre acceden por
+    # su número y contraseña corporativa; nunca por una dirección de correo.
     if "@" in usuario:
         if not usuario or not password:
             return jsonify({"ok": False, "error": "Usuario y contrasena son obligatorios."}), 400
@@ -202,12 +309,27 @@ def login():
 
 
 def _construir_nombre_perfil(perfil):
-    """Nombre legible de un perfil, compatible esquema nuevo y antiguo."""
+    """Nombre legible de un perfil, compatible esquema nuevo y antiguo.
+
+    Descarta componentes vacíos o nulos (None) para no generar nombres
+    con el literal "None" cuando el perfil solo rellena una de las partes.
+    """
     if not perfil:
         return None
+
+    def _juntar(campos):
+        partes = []
+        for campo in campos:
+            valor = perfil.get(campo)
+            if valor is not None:
+                texto = str(valor).strip()
+                if texto:
+                    partes.append(texto)
+        return " ".join(partes)
+
     if perfil.get("nombre") or perfil.get("apellidos"):
-        return f"{perfil.get('nombre', '')} {perfil.get('apellidos', '')}".strip()
-    return f"{perfil.get('first_name', '')} {perfil.get('last_name', '')}".strip()
+        return _juntar(("nombre", "apellidos"))
+    return _juntar(("first_name", "last_name"))
 
 
 def _login_supabase(email, password):
@@ -336,26 +458,104 @@ def _login_operario_supabase(num_operario, password):
         return jsonify({"ok": False, "error": "Usuario o contrasena incorrectos."}), 401
 
     try:
-        perfil = supabase.table("usuarios").select("*").eq("id", datos["usuario_id"]).single().execute().data
+        usuario_id = str(datos.get("usuario_id") or "").strip()
+        perfil = None
+        if usuario_id:
+            perfiles_por_id = (supabase.table("usuarios").select("*")
+                               .eq("id", usuario_id).limit(1).execute().data or [])
+            perfil = perfiles_por_id[0] if perfiles_por_id else None
+        # Algunas importaciones antiguas dejaron el usuario_id de la tabla de
+        # credenciales desalineado. El número de operario es la clave de
+        # negocio y permite recuperar el perfil correcto.
+        if not perfil:
+            perfil_por_numero = (supabase.table("usuarios").select("*")
+                                 .eq("numero_operario", str(num_operario).strip())
+                                 .limit(1).execute().data or [])
+            perfil = perfil_por_numero[0] if perfil_por_numero else None
     except Exception as exc:
-        logger.exception("Operario %s sin perfil aplicacion: %s", num_operario, exc)
-        return jsonify({"ok": False, "error": "El operario no tiene perfil en la aplicación."}), 403
+        logger.exception("Fallo buscando perfil del operario %s: %s", num_operario, exc)
+        return jsonify({"ok": False, "error": "No se pudo consultar el perfil del operario."}), 503
 
-    if not perfil or perfil.get("activo") is False:
-        return jsonify({"ok": False, "error": "El operario no tiene acceso activo."}), 403
-
-    user = {
-        "id": datos["usuario_id"],
-        "email": perfil.get("email"),
-        "nombre": _construir_nombre_perfil(perfil) or datos.get("nombre") or str(num_operario),
-        "rol": _obtener_nombre_rol(supabase, datos["usuario_id"])[0] or "interno",
-        "origen_login": "operarios_supabase",
-    }
-    user = enriquecer_usuario(supabase, user)
+    # El estado de acceso del operario lo gobierna operarios_login.activo.
+    # usuarios solo contiene el perfil necesario para la aplicación y no
+    # debe bloquear el acceso por tener su propio activo desactualizado.
+    if perfil:
+        user = {
+            "id": perfil.get("id") or datos.get("usuario_id"),
+            "numero_operario": str(num_operario).strip(),
+            "email": perfil.get("email"),
+            "nombre": _construir_nombre_perfil(perfil) or datos.get("nombre") or str(num_operario),
+            "rol": _obtener_nombre_rol(supabase, perfil.get("id") or datos.get("usuario_id"))[0] or "interno",
+            "origen_login": "operarios_supabase",
+        }
+        user = enriquecer_usuario(supabase, user)
+    else:
+        # Los operarios pueden autenticarse únicamente contra operarios_login.
+        # No se exige una fila equivalente en public.usuarios.
+        user = {
+            "id": f"operario:{str(num_operario).strip()}",
+            "numero_operario": str(num_operario).strip(),
+            "email": datos.get("correo"),
+            "nombre": datos.get("nombre") or str(num_operario),
+            "rol": "interno",
+            "roles": ["interno"],
+            "permisos": permisos_de_roles(["interno"]),
+            "plantas": [],
+            "proveedor_id": None,
+            "origen_login": "operarios_login",
+        }
     session.pop("access_token", None)
     session.pop("refresh_token", None)
     session["user"] = user
     return jsonify({"ok": True, "user": user})
+
+
+def _login_operario_supabase_auth(num_operario, password):
+    """Autentica un operario con Supabase Auth usando su identidad técnica."""
+    if not supabase:
+        return jsonify({"ok": False, "error": "Supabase no está configurado."}), 503
+    try:
+        perfil = (
+            supabase.table("usuarios")
+            .select("id,nombre,apellidos,email,email_tecnico,activo,requiere_cambio_password")
+            .eq("numero_operario", str(num_operario).strip())
+            .single()
+            .execute()
+            .data
+        )
+    except Exception as exc:
+        logger.exception("Fallo buscando el operario %s: %s", num_operario, exc)
+        return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos."}), 401
+
+    if not perfil or perfil.get("activo") is False:
+        return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos."}), 401
+
+    email_tecnico = perfil.get("email_tecnico") or perfil.get("email")
+    if not email_tecnico:
+        return jsonify({"ok": False, "error": "Tu cuenta todavía no está preparada. Contacta con un administrador."}), 403
+
+    try:
+        respuesta = create_client(SUPABASE_URL, SUPABASE_KEY).auth.sign_in_with_password({
+            "email": email_tecnico,
+            "password": password,
+        })
+        sesion = respuesta.session
+        user = {
+            "id": respuesta.user.id,
+            "email": None,
+            "nombre": _construir_nombre_perfil(perfil) or str(num_operario),
+            "rol": _obtener_nombre_rol(supabase, respuesta.user.id)[0] or "interno",
+            "origen_login": "operario_supabase_auth",
+            "requiere_cambio_password": bool(perfil.get("requiere_cambio_password")),
+        }
+        user = enriquecer_usuario(supabase, user)
+        session["access_token"] = sesion.access_token
+        session["refresh_token"] = sesion.refresh_token
+        session["user"] = user
+        return jsonify({"ok": True, "user": user})
+    except Exception as exc:
+        logger.exception("Fallo de Auth para operario %s: %s", num_operario, exc)
+        return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos."}), 401
 
 
 @app.route("/operarios/configurar-contrasena", methods=["POST"])
@@ -370,8 +570,6 @@ def configurar_contrasena_operario():
         return jsonify({"ok": False, "error": "Completa y confirma la nueva contraseña."}), 400
     if password != confirmacion:
         return jsonify({"ok": False, "error": "Las contraseñas no coinciden."}), 400
-    if len(password) < 5 or len(password) > 256:
-        return jsonify({"ok": False, "error": "La contraseña debe tener entre 5 y 256 caracteres."}), 400
     if not supabase:
         return jsonify({"ok": False, "error": "Supabase no está configurado."}), 503
 
@@ -384,16 +582,36 @@ def configurar_contrasena_operario():
 
     if not operario or not operario.get("activo"):
         return jsonify({"ok": False, "error": "Operario no disponible."}), 404
-    if str(operario.get("password_hash") or "").strip():
+    hash_existente = str(operario.get("password_hash") or "").strip()
+    if hash_existente:
+        # El primer intento puede haber guardado el hash y fallar después al
+        # devolver la respuesta. Hacemos la operación idempotente para que el
+        # usuario pueda reintentar con la misma contraseña sin recibir un 409.
+        if _verificar_password_operario(hash_existente, password):
+            return jsonify({"ok": True, "already_configured": True})
         return jsonify({"ok": False, "error": "Este operario ya tiene una contraseña configurada."}), 409
 
     try:
         resultado = (supabase.table("operarios_login")
                      .update({"password_hash": generate_password_hash(password),
                               "actualizado_en": datetime.now(timezone.utc).isoformat()})
-                     .eq("numero_operario", num_operario).eq("password_hash", "").execute())
+                     # El valor vacío puede llegar como NULL, cadena vacía o
+                     # espacios según cómo se importó la fila. Ya hemos
+                     # comprobado arriba que no existe un hash usable, por lo
+                     # que filtramos por el identificador y verificamos luego
+                     # el resultado para no depender de un formato concreto.
+                     .eq("numero_operario", num_operario)
+                     .select("numero_operario")
+                     .execute())
         if not resultado.data:
-            return jsonify({"ok": False, "error": "La contraseña ya fue configurada. Inicia sesión."}), 409
+            comprobacion = (supabase.table("operarios_login")
+                            .select("password_hash")
+                            .eq("numero_operario", num_operario)
+                            .single()
+                            .execute()
+                            .data)
+            if not _verificar_password_operario(comprobacion.get("password_hash"), password):
+                return jsonify({"ok": False, "error": "No se pudo guardar la contraseña."}), 503
     except Exception as exc:
         logger.exception("Fallo guardando la contraseña inicial del operario %s: %s", num_operario, exc)
         return jsonify({"ok": False, "error": "No se pudo guardar la contraseña."}), 503
@@ -611,7 +829,7 @@ def api_reservas_estructura():
     """Plantas visibles para el usuario autenticado, con sus naves y muelles.
 
     - admin / interno -> todas las plantas
-    - proveedor / externo -> solo las plantas asignadas (usuario_plantas)
+    - proveedor / externo -> plantas deducidas de sus muelles asignados
     """
     if not supabase:
         return jsonify({"error": "Supabase no configurado"}), 500
@@ -626,7 +844,7 @@ def api_reservas_estructura():
 
         resultado = []
         for p in (plantas or []):
-            if ids_visibles and p["id"] not in ids_visibles:
+            if p["id"] not in ids_visibles:
                 continue
             naves = supabase.table("naves").select("id,nombre").eq("planta_id", p["id"]).order("nombre").execute().data
             naves_con_muelles = []
@@ -683,6 +901,17 @@ def _estado_reserva(fila):
     except Exception:
         pass
     return "pendiente"
+
+
+def _es_conflicto_reserva(exc):
+    """Detecta la exclusión PostgreSQL que evita solapes concurrentes.
+
+    La validación previa mejora la experiencia de usuario, pero la restricción
+    de base de datos es la que protege cuando dos peticiones llegan a la vez.
+    PostgreSQL utiliza SQLSTATE 23P01 para una exclusión incumplida.
+    """
+    texto = str(exc).lower()
+    return "23p01" in texto or "reservas_no_solape" in texto or "exclusion constraint" in texto
 
 
 def _excepciones_de(muelle_id, fecha):
@@ -813,8 +1042,10 @@ def _verificar_acceso_planta(user_id, planta_id):
 def _ids_muelles_proveedor(user_id, cliente=None):
     """Conjunto de muelles asignados al proveedor del usuario (proveedor_muelles).
 
-    Devuelve None si NO aplica restriccion: rol admin/interno, o un proveedor que
-    aun no tiene muelles asignados (fallback: ve todos los de su planta).
+    Devuelve ``None`` únicamente cuando el rol no está restringido
+    (administración/personal interno). Para un proveedor la ausencia de
+    asignaciones es un conjunto vacío: sin una configuración explícita no puede
+    consultar ni reservar ningún muelle.
     """
     cli = cliente or supabase
     rol = _obtener_nombre_rol(cli, user_id)[0]
@@ -822,44 +1053,54 @@ def _ids_muelles_proveedor(user_id, cliente=None):
         return None
     prov = obtener_proveedor_usuario(cli, user_id)
     if not prov:
-        return None
+        return set()
     try:
         rows = cli.table("proveedor_muelles").select("muelle_id").eq("proveedor_id", prov).execute().data
     except Exception:
-        return None
-    if not rows:
-        return None  # fallback: sin asignaciones -> todos
+        # Error de configuración/consulta: nunca ampliar el acceso de un
+        # proveedor por no poder comprobar sus asignaciones.
+        return set()
     return {r["muelle_id"] for r in rows}
 
 
-def _plantas_de_proveedor(proveedor_id):
-    """Plantas asignadas a los usuarios de un proveedor (via usuario_plantas)."""
+def _plantas_de_proveedor(proveedor_id, cliente=None):
+    """Plantas que se derivan de los muelles asignados a un proveedor.
+
+    ``proveedor_muelles`` es la única fuente de autorización externa; una
+    planta aparece porque contiene al menos uno de esos muelles.
+    """
+    cli = cliente or supabase
     try:
-        usuarios = supabase.table("usuarios").select("id").eq("proveedor_id", proveedor_id).execute().data
-        ids = [u["id"] for u in (usuarios or [])]
-        if not ids:
+        asignaciones = (cli.table("proveedor_muelles").select("muelle_id")
+                        .eq("proveedor_id", proveedor_id).execute().data or [])
+        muelle_ids = [a["muelle_id"] for a in asignaciones if a.get("muelle_id")]
+        if not muelle_ids:
             return set()
-        ups = supabase.table("usuario_plantas").select("planta_id").in_("usuario_id", ids).execute().data
-        return {u["planta_id"] for u in (ups or [])}
+        muelles = (cli.table("muelles").select("nave_id").in_("id", muelle_ids)
+                   .execute().data or [])
+        nave_ids = [m["nave_id"] for m in muelles if m.get("nave_id")]
+        if not nave_ids:
+            return set()
+        naves = (cli.table("naves").select("planta_id").in_("id", nave_ids)
+                 .execute().data or [])
+        return {n["planta_id"] for n in naves if n.get("planta_id")}
     except Exception:
         return set()
 
 
 def _validar_proveedor_muelle(body):
-    """Valida que el muelle asignado a un proveedor este en una planta asignada a
-    los usuarios de ese proveedor (evita inconsistencias desde configuracion).
-    Devuelve (None, None) si ok; si no (mensaje, status).
+    """Valida que la asignación referencia un proveedor y un muelle reales.
+
+    La relación no depende de ``usuario_plantas``: asignar el muelle ya otorga
+    acceso a su planta al proveedor.
     """
     proveedor_id = body.get("proveedor_id")
     muelle_id = body.get("muelle_id")
     if not proveedor_id or not muelle_id:
         return None, None
-    plantas = _plantas_de_proveedor(proveedor_id)
-    if not plantas:
-        return ("Este proveedor no tiene usuarios con plantas asignadas. Asigna primero una planta a sus usuarios.", 400)
     planta_muelle = _planta_de_muelle(muelle_id)
-    if planta_muelle and planta_muelle not in plantas:
-        return ("El muelle pertenece a una planta no asignada a los usuarios de este proveedor.", 400)
+    if not planta_muelle:
+        return ("El muelle indicado no existe o no tiene una planta válida.", 400)
     return None, None
 
 
@@ -1183,6 +1424,8 @@ def api_reservas_crear():
         }).execute()
         return jsonify({"ok": True, "reserva": (data.data or [{}])[0]}), 201
     except Exception as e:
+        if _es_conflicto_reserva(e):
+            return jsonify({"error": "Ese muelle acaba de ocuparse en la franja seleccionada. Elige otro horario."}), 409
         return jsonify({"error": str(e)}), 500
 
 
@@ -1273,6 +1516,8 @@ def api_reservas_modificar(rid):
         }).eq("id", rid).execute()
         return jsonify({"ok": True})
     except Exception as e:
+        if _es_conflicto_reserva(e):
+            return jsonify({"error": "Ese muelle acaba de ocuparse en la franja seleccionada. Elige otro horario."}), 409
         return jsonify({"error": str(e)}), 500
 
 
@@ -1379,15 +1624,13 @@ def api_reservas_todas():
 
 @app.route("/api/proveedor-muelles/plantas")
 def api_proveedor_muelles_plantas():
-    """Plantas asignadas a los usuarios de un proveedor (para restringir la
-    asignacion de muelles a ese proveedor en configuracion). Solo admin/interno."""
+    """Plantas derivadas de los muelles configurados para un proveedor."""
     if not supabase:
         return jsonify({"error": "Supabase no configurado"}), 500
     user = session.get("user")
     if not user:
         return jsonify({"error": "No autenticado"}), 401
-    rol = _obtener_nombre_rol(supabase, user["id"])[0]
-    if rol not in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
+    if not usuario_actual_puede_configurar():
         return jsonify({"error": "No autorizado"}), 403
     proveedor_id = request.args.get("proveedor_id")
     if not proveedor_id:
@@ -1401,6 +1644,102 @@ def api_proveedor_muelles_plantas():
         if p:
             resultado.append(p)
     return jsonify({"plantas": resultado})
+
+
+@app.route("/api/disponibilidad-muelles/configurar", methods=["POST"])
+def api_disponibilidad_muelles_configurar():
+    """Configura disponibilidad periódica en lote, evitando solapes.
+
+    ``agregar`` permite varias franjas en un mismo muelle/día; ``reemplazar``
+    sustituye todas las franjas de los muelles y días indicados; ``limpiar``
+    deja esos días sin disponibilidad periódica. Las excepciones por fecha se
+    gestionan por separado y no se modifican aquí.
+    """
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_puede_configurar():
+        return jsonify({"error": "No tienes permisos para gestionar la configuración."}), 403
+
+    body = request.json or {}
+    muelle_ids = list(dict.fromkeys(body.get("muelle_ids") or []))
+    try:
+        dias = sorted({int(dia) for dia in (body.get("dias") or [])})
+    except (TypeError, ValueError):
+        return jsonify({"error": "Los días indicados no son válidos."}), 400
+    modo = body.get("modo") or "agregar"
+    if not muelle_ids or not dias:
+        return jsonify({"error": "Selecciona al menos un muelle y un día."}), 400
+    if any(dia < 0 or dia > 6 for dia in dias):
+        return jsonify({"error": "Los días deben estar entre lunes (0) y domingo (6)."}), 400
+    if modo not in {"agregar", "reemplazar", "limpiar", "editar"}:
+        return jsonify({"error": "El modo de configuración no es válido."}), 400
+
+    hora_inicio = str(body.get("hora_inicio") or "")[:5]
+    hora_fin = str(body.get("hora_fin") or "")[:5]
+    if modo != "limpiar":
+        try:
+            inicio = datetime.strptime(hora_inicio, "%H:%M").time()
+            fin = datetime.strptime(hora_fin, "%H:%M").time()
+        except ValueError:
+            return jsonify({"error": "Indica una hora de inicio y fin válidas."}), 400
+        if inicio >= fin:
+            return jsonify({"error": "La hora de fin debe ser posterior a la hora de inicio."}), 400
+
+    try:
+        muelles = (supabase.table("muelles").select("id,activo").in_("id", muelle_ids)
+                   .execute().data or [])
+        if len({m["id"] for m in muelles}) != len(muelle_ids):
+            return jsonify({"error": "Uno o más muelles no existen."}), 400
+        if any(m.get("activo") is False for m in muelles):
+            return jsonify({"error": "No se puede configurar disponibilidad en un muelle inactivo."}), 400
+
+        eliminar_ids = {str(valor) for valor in (body.get("eliminar_ids") or [])}
+        # Antes de borrar, comprobar que una nueva franja no solapa otra que
+        # vaya a permanecer activa. Permite editar una franja existente.
+        if modo in {"agregar", "editar"}:
+            for muelle_id in muelle_ids:
+                for dia in dias:
+                    existentes = (supabase.table("disponibilidad_muelles")
+                                  .select("id,hora_inicio,hora_fin")
+                                  .eq("muelle_id", muelle_id).eq("dia_semana", dia)
+                                  .eq("activo", True).execute().data or [])
+                    for existente in existentes:
+                        if str(existente["id"]) in eliminar_ids:
+                            continue
+                        desde = str(existente["hora_inicio"])[:5]
+                        hasta = str(existente["hora_fin"])[:5]
+                        if not (hora_fin <= desde or hora_inicio >= hasta):
+                            return jsonify({
+                                "error": "La franja se solapa con una disponibilidad existente. Añade una franja que no se cruce o usa Reemplazar horario."
+                            }), 409
+
+        if modo == "editar":
+            for registro_id in eliminar_ids:
+                supabase.table("disponibilidad_muelles").delete().eq("id", registro_id).execute()
+        elif modo in {"reemplazar", "limpiar"}:
+            for muelle_id in muelle_ids:
+                for dia in dias:
+                    supabase.table("disponibilidad_muelles").delete().eq("muelle_id", muelle_id).eq("dia_semana", dia).execute()
+
+        if modo == "limpiar":
+            return jsonify({"ok": True, "creados": 0, "limpiados": len(muelle_ids) * len(dias)})
+
+        activo = bool(body.get("activo", True))
+        nuevos = [
+            {
+                "muelle_id": muelle_id,
+                "dia_semana": dia,
+                "hora_inicio": hora_inicio,
+                "hora_fin": hora_fin,
+                "activo": activo,
+            }
+            for muelle_id in muelle_ids for dia in dias
+        ]
+        creados = supabase.table("disponibilidad_muelles").insert(nuevos).execute().data or []
+        return jsonify({"ok": True, "creados": len(creados), "limpiados": 0})
+    except Exception as exc:
+        logger.exception("No se pudo configurar disponibilidad: %s", exc)
+        return jsonify({"error": "No se pudo guardar la disponibilidad."}), 500
 
 
 # ==========================================================================
@@ -1522,12 +1861,63 @@ def modulo():
     return render_template("modulo.html")
 
 
+@app.route("/api/proveedor-muelles/asignar", methods=["POST"])
+def api_proveedor_muelles_asignar():
+    """Asigna varios muelles a un proveedor sin duplicar relaciones existentes."""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_puede_configurar():
+        return jsonify({"error": "No tienes permisos para gestionar la configuración."}), 403
+
+    body = request.json or {}
+    proveedor_id = body.get("proveedor_id")
+    muelle_ids = list(dict.fromkeys(body.get("muelle_ids") or []))
+    if not proveedor_id:
+        return jsonify({"error": "Debes indicar un proveedor."}), 400
+    if not muelle_ids:
+        return jsonify({"error": "Selecciona al menos un muelle."}), 400
+
+    try:
+        proveedor = (supabase.table("proveedores").select("id").eq("id", proveedor_id)
+                     .single().execute().data)
+        if not proveedor:
+            return jsonify({"error": "El proveedor indicado no existe."}), 400
+
+        existentes = (supabase.table("proveedor_muelles").select("muelle_id")
+                      .eq("proveedor_id", proveedor_id).execute().data or [])
+        ids_existentes = {fila["muelle_id"] for fila in existentes}
+        nuevos = []
+        for muelle_id in muelle_ids:
+            err, status = _validar_proveedor_muelle({
+                "proveedor_id": proveedor_id,
+                "muelle_id": muelle_id,
+            })
+            if err:
+                return jsonify({"error": err}), status
+            if muelle_id not in ids_existentes:
+                nuevos.append({"proveedor_id": proveedor_id, "muelle_id": muelle_id})
+
+        creados = supabase.table("proveedor_muelles").insert(nuevos).execute().data if nuevos else []
+        return jsonify({
+            "ok": True,
+            "asignados": len(creados or []),
+            "ya_asignados": len(muelle_ids) - len(nuevos),
+        }), 201
+    except Exception as exc:
+        logger.exception("No se pudieron asignar muelles al proveedor %s: %s", proveedor_id, exc)
+        return jsonify({"error": "No se pudieron asignar los muelles seleccionados."}), 500
+
+
 @app.route("/api/crud/<tabla>", methods=["GET", "POST", "PUT", "DELETE"])
 def api_crud_lista(tabla):
     if not supabase:
         return jsonify({"error": "Supabase no configurado"}), 500
     if tabla not in CRUD_TABLAS:
         return jsonify({"error": "Tabla no permitida"}), 403
+    if not usuario_actual_puede_configurar():
+        return jsonify({"error": "No tienes permisos para gestionar la configuración."}), 403
+    if tabla in {"roles", "usuarios", "usuario_plantas"} and not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para gestionar usuarios o roles."}), 403
 
     try:
         if request.method == "GET":
@@ -1593,6 +1983,10 @@ def api_crud_registro(tabla, id):
         return jsonify({"error": "Tabla no permitida"}), 403
     if tabla in CRUD_SOLO_LECTURA:
         return jsonify({"error": "Modulo de solo lectura"}), 403
+    if not usuario_actual_puede_configurar():
+        return jsonify({"error": "No tienes permisos para gestionar la configuración."}), 403
+    if tabla in {"roles", "usuarios", "usuario_plantas"} and not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para gestionar usuarios o roles."}), 403
 
     try:
         if request.method == "PUT":
@@ -1631,6 +2025,8 @@ def api_usuarios():
     """Gestion de usuarios (simplificada: rol es TEXT)."""
     if not supabase:
         return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para gestionar usuarios."}), 403
 
     if request.method == "GET":
         try:
@@ -1688,6 +2084,50 @@ def api_usuarios():
                     "tipo_usuario_forzado": u.get("tipo_usuario_forzado") or "",
                     "activo": u.get("activo") if "activo" in u else u.get("active", True),
                 })
+
+            # Las cuentas de operario no son cuentas de correo ni de Auth: se
+            # identifican por número y contraseña en operarios_login. Se
+            # incluyen en el listado como internos operativos aunque todavía
+            # no tengan una fila de perfil convencional en usuarios.
+            ids_con_perfil = {str(u.get("numero_operario") or "") for u in usuarios}
+            try:
+                cuentas_operario = (
+                    supabase.table("operarios_login")
+                    .select("numero_operario,nombre,password_hash,activo")
+                    .execute()
+                    .data
+                    or []
+                )
+                censo_operarios = (
+                    supabase.table("operarios_corporativos")
+                    .select("numero_operario,nombre,activo")
+                    .execute()
+                    .data
+                    or []
+                )
+                nombres_censo = {str(f["numero_operario"]): f for f in censo_operarios}
+                for cuenta in cuentas_operario:
+                    numero = str(cuenta.get("numero_operario") or "").strip()
+                    if not numero or numero in ids_con_perfil or not str(cuenta.get("password_hash") or "").strip():
+                        continue
+                    operario = nombres_censo.get(numero) or {}
+                    partes = str(operario.get("nombre") or cuenta.get("nombre") or numero).split(None, 1)
+                    usuarios.append({
+                        "id": f"operario:{numero}",
+                        "email": "",
+                        "nombre": partes[0],
+                        "apellidos": partes[1] if len(partes) > 1 else "",
+                        "rol_id": None,
+                        "role_name": "interno",
+                        "proveedor_id": None,
+                        "departamento_id": None,
+                        "numero_operario": numero,
+                        "tipo_registro": "OPERARIO",
+                        "es_operario": True,
+                        "activo": cuenta.get("activo") is not False and operario.get("activo") is not False,
+                    })
+            except Exception as exc:
+                logger.warning("No se pudieron añadir operarios al listado de usuarios: %s", exc)
             return jsonify({"usuarios": usuarios})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1698,6 +2138,9 @@ def api_usuarios():
     password = body.get("password") or ""
     if not email or not password:
         return jsonify({"error": "Email y contrasena son obligatorios."}), 400
+    error_vinculo = _validar_vinculo_proveedor(body)
+    if error_vinculo:
+        return jsonify({"error": error_vinculo}), 400
 
     try:
         res = supabase.auth.admin.create_user({
@@ -1736,6 +2179,8 @@ def api_usuarios():
 def api_usuario(id):
     if not supabase:
         return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para gestionar usuarios."}), 403
 
     if request.method == "DELETE":
         if id == (session.get("user") or {}).get("id"):
@@ -1748,6 +2193,9 @@ def api_usuario(id):
 
     # PUT
     body = request.json or {}
+    error_vinculo = _validar_vinculo_proveedor(body, id)
+    if error_vinculo:
+        return jsonify({"error": error_vinculo}), 400
     try:
         datos = {}
         for campo in ["nombre", "apellidos", "rol_id", "proveedor_id", "departamento_id", "numero_operario", "origen_operario", "tipo_usuario_forzado"]:
@@ -1764,6 +2212,340 @@ def api_usuario(id):
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/invitaciones", methods=["GET", "POST"])
+def api_invitaciones():
+    """Preautoriza y envía invitaciones de Supabase a internos o externos."""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para enviar invitaciones."}), 403
+
+    if request.method == "GET":
+        try:
+            datos = (
+                supabase.table("invitaciones_registro")
+                .select("*")
+                .order("creado_at", desc=True)
+                .limit(100)
+                .execute()
+                .data
+            )
+            return jsonify({"invitaciones": datos or []})
+        except Exception as exc:
+            logger.exception("No se pudieron leer las invitaciones: %s", exc)
+            return jsonify({"error": "No se pudieron consultar las invitaciones."}), 500
+
+    datos = request.json or {}
+    email = str(datos.get("email") or "").strip().lower()
+    tipo_usuario = str(datos.get("tipo_usuario") or "").strip().upper()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        return jsonify({"error": "Indica un email válido."}), 400
+    if tipo_usuario not in {"INTERNO", "EXTERNO"}:
+        return jsonify({"error": "El tipo de usuario debe ser INTERNO o EXTERNO."}), 400
+    if not datos.get("rol_id"):
+        return jsonify({"error": "Debes indicar el rol que tendrá el usuario."}), 400
+    if tipo_usuario == "EXTERNO" and not datos.get("proveedor_id"):
+        return jsonify({"error": "Debes indicar el proveedor del usuario externo."}), 400
+
+    # El tipo de la invitación debe coincidir con el rol elegido. No basta con
+    # ocultar opciones en el navegador: una petición manual no puede convertir
+    # a un proveedor en usuario interno (ni a la inversa).
+    try:
+        rol = supabase.table("roles").select("nombre").eq("id", datos["rol_id"]).single().execute().data or {}
+        nombre_rol = str(rol.get("nombre") or "").strip().casefold()
+    except Exception:
+        return jsonify({"error": "El rol seleccionado no existe o no está disponible."}), 400
+    es_rol_externo = _es_rol_externo(nombre_rol)
+    if tipo_usuario == "EXTERNO" and not es_rol_externo:
+        return jsonify({"error": "Un proveedor externo debe tener un rol de proveedor."}), 400
+    if tipo_usuario == "INTERNO" and es_rol_externo:
+        return jsonify({"error": "Un usuario interno no puede tener un rol de proveedor."}), 400
+    if tipo_usuario == "INTERNO" and datos.get("proveedor_id"):
+        return jsonify({"error": "Un usuario interno no debe estar vinculado a un proveedor."}), 400
+
+    invitacion = {
+        "email": email,
+        "tipo_usuario": tipo_usuario,
+        "proveedor_id": datos.get("proveedor_id") or None,
+        "rol_id": datos.get("rol_id") or None,
+        "creado_por": (session.get("user") or {}).get("id"),
+        "estado": "PENDIENTE",
+    }
+    try:
+        creada = supabase.table("invitaciones_registro").insert(invitacion).execute().data[0]
+    except Exception as exc:
+        logger.exception("No se pudo crear invitación para %s: %s", email, exc)
+        return jsonify({"error": "Ya existe una invitación pendiente para este email o no se pudo crear."}), 409
+
+    try:
+        respuesta = supabase.auth.admin.invite_user_by_email(
+            email,
+            {"redirect_to": f"{APP_URL}/registro"},
+        )
+        supabase.table("invitaciones_registro").update({
+            "estado": "ENVIADA",
+            "supabase_user_id": respuesta.user.id if respuesta.user else None,
+        }).eq("id", creada["id"]).execute()
+        return jsonify({"ok": True, "invitacion": creada}), 201
+    except Exception as exc:
+        logger.exception("No se pudo enviar invitación a %s: %s", email, exc)
+        # La preautorización se conserva para que un administrador pueda
+        # reenviarla; no se marca como aceptada ni se crea ningún perfil.
+        return jsonify({"error": "La invitación se ha guardado, pero no se pudo enviar el email."}), 502
+
+
+@app.route("/api/registro/aceptar", methods=["POST"])
+def api_aceptar_registro():
+    """Completa el perfil tras aceptar una invitación de Supabase Auth."""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not token:
+        return jsonify({"error": "La invitación no contiene una sesión válida."}), 401
+    try:
+        respuesta = create_client(SUPABASE_URL, SUPABASE_KEY).auth.get_user(token)
+        usuario_auth = respuesta.user
+        email = (usuario_auth.email or "").strip().lower()
+    except Exception:
+        return jsonify({"error": "La invitación ha caducado o no es válida."}), 401
+
+    try:
+        invitaciones = (
+            supabase.table("invitaciones_registro")
+            .select("*")
+            .ilike("email", email)
+            .in_("estado", ["PENDIENTE", "ENVIADA"])
+            .gte("caduca_at", datetime.now(timezone.utc).isoformat())
+            .order("creado_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        invitacion = invitaciones[0] if invitaciones else None
+    except Exception as exc:
+        logger.exception("No se pudo validar invitación de %s: %s", email, exc)
+        return jsonify({"error": "No se ha podido validar la invitación."}), 500
+
+    if not invitacion:
+        return jsonify({"error": "No existe una invitación válida para este email."}), 403
+
+    datos = request.json or {}
+    try:
+        supabase.table("usuarios").upsert({
+            "id": usuario_auth.id,
+            "email": email,
+            "nombre": str(datos.get("nombre") or "").strip(),
+            "apellidos": str(datos.get("apellidos") or "").strip(),
+            "rol_id": invitacion.get("rol_id"),
+            "proveedor_id": invitacion.get("proveedor_id"),
+            "activo": True,
+            "tipo_usuario_forzado": invitacion["tipo_usuario"],
+            "tipo_registro": "INVITACION",
+        }).execute()
+        supabase.table("invitaciones_registro").update({
+            "estado": "ACEPTADA",
+            "usado_at": datetime.now(timezone.utc).isoformat(),
+            "supabase_user_id": usuario_auth.id,
+        }).eq("id", invitacion["id"]).execute()
+        return jsonify({"ok": True})
+    except Exception as exc:
+        logger.exception("No se pudo crear perfil desde invitación de %s: %s", email, exc)
+        return jsonify({"error": "No se pudo completar el registro."}), 500
+
+
+@app.route("/api/admin/operarios/<numero_operario>/cuenta", methods=["POST"])
+def api_crear_cuenta_operario(numero_operario):
+    """Asigna una contraseña al número de un operario sincronizado."""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para crear cuentas de operario."}), 403
+    datos = request.json or {}
+    password = str(datos.get("password") or "")
+    if not password:
+        return jsonify({"error": "Debes indicar una contraseña."}), 400
+    try:
+        operario = (
+            supabase.table("operarios_corporativos")
+            .select("numero_operario,nombre,activo")
+            .eq("numero_operario", str(numero_operario).strip())
+            .single()
+            .execute()
+            .data
+        )
+        existente = (
+            supabase.table("operarios_login")
+            .select("numero_operario,password_hash")
+            .eq("numero_operario", str(numero_operario).strip())
+            .limit(1)
+            .execute()
+            .data
+        )
+    except Exception as exc:
+        logger.exception("No se pudo preparar la cuenta del operario %s: %s", numero_operario, exc)
+        return jsonify({"error": "No se ha podido consultar el operario."}), 500
+    if not operario or not operario.get("activo"):
+        return jsonify({"error": "El operario no existe o está inactivo."}), 404
+    if existente and str(existente[0].get("password_hash") or "").strip():
+        return jsonify({"error": "Este operario ya tiene una contraseña asignada."}), 409
+    try:
+        datos_login = {
+            "password_hash": generate_password_hash(password),
+            "activo": True,
+            "actualizado_en": datetime.now(timezone.utc).isoformat(),
+        }
+        if existente:
+            supabase.table("operarios_login").update(datos_login).eq(
+                "numero_operario", str(numero_operario).strip()
+            ).execute()
+        else:
+            supabase.table("operarios_login").insert({
+                "numero_operario": operario["numero_operario"],
+                "nombre": operario["nombre"],
+                **datos_login,
+            }).execute()
+        return jsonify({"ok": True}), 201
+    except Exception as exc:
+        logger.exception("No se pudo crear cuenta para el operario %s: %s", numero_operario, exc)
+        return jsonify({"error": "No se pudo crear la cuenta del operario."}), 500
+
+
+@app.route("/api/admin/operarios", methods=["GET"])
+def api_operarios_administracion():
+    """Lista el estado de las identidades corporativas y sus cuentas."""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para consultar operarios."}), 403
+    try:
+        operarios = (
+            supabase.table("operarios_corporativos")
+            .select("numero_operario,nombre,correo,activo,origen,fecha_ultima_sincronizacion")
+            .order("nombre")
+            .limit(1000)
+            .execute()
+            .data
+        ) or []
+        cuentas = (
+            supabase.table("operarios_login")
+            .select("numero_operario,password_hash,activo")
+            .execute()
+            .data
+        ) or []
+        por_numero = {str(cuenta["numero_operario"]): cuenta for cuenta in cuentas}
+        resultado = []
+        for operario in operarios:
+            cuenta = por_numero.get(str(operario["numero_operario"]))
+            resultado.append({
+                **operario,
+                "tiene_cuenta": bool(cuenta and str(cuenta.get("password_hash") or "").strip()),
+                "cuenta_activa": cuenta.get("activo") if cuenta else False,
+            })
+        return jsonify({"operarios": resultado})
+    except Exception as exc:
+        logger.exception("No se pudieron listar operarios: %s", exc)
+        return jsonify({"error": "No se pudieron consultar los operarios sincronizados."}), 500
+
+
+@app.route("/api/admin/operarios/<numero_operario>/restablecer-contrasena", methods=["POST"])
+def api_restaurar_contrasena_operario(numero_operario):
+    """Establece una contraseña temporal entregada por el administrador."""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para restablecer contraseñas."}), 403
+    password = str((request.json or {}).get("password") or "")
+    if not password:
+        return jsonify({"error": "Debes indicar una contraseña."}), 400
+    try:
+        filas = (
+            supabase.table("operarios_login")
+            .select("numero_operario,password_hash")
+            .eq("numero_operario", str(numero_operario).strip())
+            .limit(1)
+            .execute()
+            .data
+        )
+        if not filas:
+            return jsonify({"error": "El operario no tiene una cuenta asociada."}), 404
+        supabase.table("operarios_login").update({
+            "password_hash": generate_password_hash(password),
+            "actualizado_en": datetime.now(timezone.utc).isoformat(),
+        }).eq("numero_operario", str(numero_operario).strip()).execute()
+        return jsonify({"ok": True})
+    except Exception as exc:
+        logger.exception("No se pudo restablecer contraseña del operario %s: %s", numero_operario, exc)
+        return jsonify({"error": "No se pudo restablecer la contraseña."}), 500
+
+
+@app.route("/api/mi-cuenta/cambiar-contrasena", methods=["POST"])
+def api_cambiar_contrasena_propia():
+    """Permite a un operario cerrar el ciclo de contraseña temporal."""
+    usuario = session.get("user") or {}
+    if not usuario.get("id"):
+        return jsonify({"error": "Debes iniciar sesión."}), 401
+    password = str((request.json or {}).get("password") or "")
+    if not password:
+        return jsonify({"error": "Debes indicar una contraseña."}), 400
+    try:
+        numero_operario = str(usuario.get("numero_operario") or "").strip()
+        if not numero_operario:
+            return jsonify({"error": "Esta cuenta no es un operario."}), 400
+        supabase.table("operarios_login").update({
+            "password_hash": generate_password_hash(password),
+            "actualizado_en": datetime.now(timezone.utc).isoformat(),
+        }).eq("numero_operario", numero_operario).execute()
+        usuario["requiere_cambio_password"] = False
+        session["user"] = usuario
+        return jsonify({"ok": True})
+    except Exception as exc:
+        logger.exception("No se pudo cambiar la contraseña propia: %s", exc)
+        return jsonify({"error": "No se pudo cambiar la contraseña."}), 500
+
+
+@app.route("/api/admin/sincronizar-operarios", methods=["GET", "POST"])
+def api_sincronizar_operarios():
+    """Encola una sincronización para el agente de la red corporativa."""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para sincronizar operarios."}), 403
+
+    if request.method == "GET":
+        try:
+            ultima_solicitud = (
+                supabase.table("solicitudes_sincronizacion_operarios")
+                .select("*")
+                .order("solicitado_en", desc=True)
+                .limit(1)
+                .execute()
+                .data
+            )
+            return jsonify({"solicitud": ultima_solicitud[0] if ultima_solicitud else None})
+        except Exception as exc:
+            logger.exception("No se pudo obtener la última solicitud de sincronización: %s", exc)
+            return jsonify({"error": "No se pudo consultar la sincronización."}), 500
+
+    try:
+        pendientes = (
+            supabase.table("solicitudes_sincronizacion_operarios")
+            .select("id")
+            .in_("estado", ["PENDIENTE", "EN_CURSO"])
+            .limit(1)
+            .execute()
+            .data
+        )
+        if pendientes:
+            return jsonify({"error": "Ya hay una sincronización pendiente o en curso."}), 409
+        solicitud = supabase.table("solicitudes_sincronizacion_operarios").insert({
+            "solicitado_por": (session.get("user") or {}).get("id"),
+        }).execute().data[0]
+        return jsonify({"ok": True, "solicitud": solicitud}), 202
+    except Exception as exc:
+        logger.exception("No se pudo crear la solicitud de sincronización: %s", exc)
+        return jsonify({"error": "No se pudo solicitar la sincronización."}), 500
 
 
 if __name__ == "__main__":

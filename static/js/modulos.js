@@ -90,8 +90,9 @@ const MODULOS = {
     orderBy: 'proveedor_id',
     campos: [
       { campo: 'proveedor_id', etiqueta: 'Proveedor', tipo: 'fk', ref: { tabla: 'proveedores', campo: 'nombre' }, requerido: true },
-      // Planta: se limita a las plantas de los usuarios del proveedor (evita inconsistencias)
-      { campo: 'planta_id', etiqueta: 'Planta', tipo: 'fk', ref: { tabla: 'plantas', campo: 'nombre' }, porProveedor: 'proveedor_id', opcionesPorProveedorUrl: '/api/proveedor-muelles/plantas?proveedor_id=', soloFiltro: true, enTabla: false },
+      // La planta se elige para localizar el muelle. El acceso del proveedor
+      // se deriva después de la asignación, no de usuario_plantas.
+      { campo: 'planta_id', etiqueta: 'Planta', tipo: 'fk', ref: { tabla: 'plantas', campo: 'nombre' }, soloFiltro: true, enTabla: false },
       { campo: 'nave_id', etiqueta: 'Nave', tipo: 'fk', ref: { tabla: 'naves', campo: 'nombre' }, dependeDe: 'planta_id', soloFiltro: true, enTabla: false },
       // Columnas de contexto (solo lectura): Planta y Nave del muelle elegido.
       // Se resuelven en cadena: muelle -> nave -> planta (campo 'via' como array).
