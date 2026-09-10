@@ -7,7 +7,18 @@ load_dotenv()
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
-APP_URL = os.environ.get("APP_URL", "http://localhost:5000").rstrip("/")
+# En Render, RENDER_EXTERNAL_URL es la URL pública del servicio. También se
+# prioriza frente a un APP_URL local heredado, porque localhost nunca es un
+# destino válido para enlaces enviados por correo desde producción.
+_configured_app_url = os.environ.get("APP_URL")
+_render_external_url = os.environ.get("RENDER_EXTERNAL_URL")
+if _render_external_url and (
+    not _configured_app_url
+    or _configured_app_url.rstrip("/").startswith(("http://localhost", "https://localhost"))
+):
+    APP_URL = _render_external_url.rstrip("/")
+else:
+    APP_URL = (_configured_app_url or "http://localhost:5000").rstrip("/")
 # Mantiene el acceso anterior mientras se validan cuentas técnicas de operario.
 OPERARIOS_AUTH_SUPABASE_ONLY = os.environ.get(
     "OPERARIOS_AUTH_SUPABASE_ONLY", "0"
