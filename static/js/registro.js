@@ -27,15 +27,6 @@
     m.className = 'login-message';
   }
 
-  function ocultarCamposAdministrativos() {
-    ['f_rol_id', 'f_departamento_id', 'f_proveedor_id'].forEach(function (id) {
-      var campo = document.getElementById(id);
-      if (campo && campo.closest('.reg-field')) campo.closest('.reg-field').style.display = 'none';
-    });
-    var plantas = document.getElementById('plantasBox');
-    if (plantas && plantas.closest('.reg-field')) plantas.closest('.reg-field').style.display = 'none';
-  }
-
   async function obtenerSesionInvitacion() {
     clienteAuth = await SupabaseApp.getClient();
     if (!clienteAuth) {
@@ -111,7 +102,6 @@
 
   document.addEventListener('DOMContentLoaded', async function () {
     initLenguaje();
-    ocultarCamposAdministrativos();
     document.getElementById('registroForm').addEventListener('submit', registrar);
     try {
       await obtenerSesionInvitacion();

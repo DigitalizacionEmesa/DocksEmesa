@@ -233,7 +233,9 @@
 
   function abrirModalInvitacion(tipoUsuario) {
     var externo = tipoUsuario === "EXTERNO";
-    var rolesDisponibles = roles.filter(function(r) { return esRolExterno(r) === externo; });
+    var rolesDisponibles = roles.filter(function(r) {
+      return !externo && ["admin", "interno"].indexOf(String(r.nombre || "").trim().toLowerCase()) !== -1;
+    });
     var rolOpts = "<option value=\"\">— " + t("Selecciona un rol") + " —</option>" + rolesDisponibles.map(function(r) {
       return "<option value=\"" + r.id + "\">" + esc(r.nombre) + "</option>";
     }).join("");
@@ -241,12 +243,10 @@
       return "<option value=\"" + p.id + "\">" + esc(p.nombre) + "</option>";
     }).join("");
     document.getElementById("invitacionForm").innerHTML =
-      "<div class=\"crud-field full\"><label>" + t("Email autorizado") + "</label><input type=\"email\" id=\"i_email\" required autocomplete=\"email\"></div>"
-      + "<div class=\"crud-field\"><label>" + t("Tipo de acceso") + "</label><input type=\"text\" value=\"" + (externo ? t("Proveedor externo") : t("Usuario interno")) + "\" readonly><input type=\"hidden\" id=\"i_tipo\" value=\"" + tipoUsuario + "\"></div>"
-      + "<div class=\"crud-field\"><label>" + t("Rol") + "</label><select id=\"i_rol\" required>" + rolOpts + "</select></div>"
+      "<div class=\"crud-field full\"><label>" + t("Email autorizado") + "</label><input type=\"email\" id=\"i_email\" required autocomplete=\"email\"><input type=\"hidden\" id=\"i_tipo\" value=\"" + tipoUsuario + "\"></div>"
       + (externo
-        ? "<div class=\"crud-field full\"><label>" + t("Proveedor") + "</label><select id=\"i_proveedor\" required>" + provOpts + "</select><small>" + t("Los muelles se autorizan después en Proveedor-Muelles.") + "</small></div>"
-        : "<div class=\"crud-field full\"><div class=\"modulo-aviso warning\" style=\"max-width:none;margin:0;\">" + t("El departamento y las plantas se completan al editar el perfil cuando la invitación haya sido aceptada.") + "</div><input type=\"hidden\" id=\"i_proveedor\" value=\"\"></div>");
+        ? "<div class=\"crud-field full\"><label>" + t("Proveedor") + "</label><select id=\"i_proveedor\" required>" + provOpts + "</select><input type=\"hidden\" id=\"i_rol\" value=\"\"></div>"
+        : "<div class=\"crud-field full\"><label>" + t("Rol") + "</label><select id=\"i_rol\" required>" + rolOpts + "</select><input type=\"hidden\" id=\"i_proveedor\" value=\"\"></div>");
     document.getElementById("invitacionModalTitulo").textContent = externo ? t("Invitar proveedor externo") : t("Invitar usuario interno");
     document.getElementById("invitacionModal").classList.add("active");
   }
@@ -268,17 +268,17 @@
     var boton = document.getElementById("invitacionEnviar");
     boton.disabled = true;
     try {
-      await SupabaseApp.api("/api/admin/invitaciones", {
+      var respuesta = await SupabaseApp.api("/api/admin/invitaciones", {
         method: "POST",
         body: {
           email: document.getElementById("i_email").value.trim(),
           tipo_usuario: document.getElementById("i_tipo").value,
-          rol_id: document.getElementById("i_rol").value,
+          rol_id: document.getElementById("i_rol").value || null,
           proveedor_id: document.getElementById("i_proveedor").value || null
         }
       });
       cerrarModalInvitacion();
-      notificar(t("Invitación enviada"), "success");
+      notificar(t(respuesta.reenviada ? "Invitación reenviada" : "Invitación enviada"), "success");
     } catch (err) {
       notificar(t("Error") + ": " + mensajeErrorAmigable(err), "error");
     } finally {

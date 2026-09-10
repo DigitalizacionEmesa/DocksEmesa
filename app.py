@@ -334,7 +334,10 @@ def _construir_nombre_perfil(perfil):
 
 def _login_supabase(email, password):
     try:
-        cliente_auth = create_client(SUPABASE_URL, SUPABASE_KEY)
+        # El acceso con email y contraseña se realiza como cliente público de
+        # Supabase Auth. La clave secreta queda reservada para las acciones
+        # administrativas del backend (invitaciones, perfiles y borrados).
+        cliente_auth = create_client(SUPABASE_URL, SUPABASE_ANON_KEY or SUPABASE_KEY)
         respuesta = cliente_auth.auth.sign_in_with_password({
             "email": email,
             "password": password
@@ -2244,32 +2247,90 @@ def api_invitaciones():
         return jsonify({"error": "Indica un email válido."}), 400
     if tipo_usuario not in {"INTERNO", "EXTERNO"}:
         return jsonify({"error": "El tipo de usuario debe ser INTERNO o EXTERNO."}), 400
-    if not datos.get("rol_id"):
-        return jsonify({"error": "Debes indicar el rol que tendrá el usuario."}), 400
     if tipo_usuario == "EXTERNO" and not datos.get("proveedor_id"):
         return jsonify({"error": "Debes indicar el proveedor del usuario externo."}), 400
 
-    # El tipo de la invitación debe coincidir con el rol elegido. No basta con
-    # ocultar opciones en el navegador: una petición manual no puede convertir
-    # a un proveedor en usuario interno (ni a la inversa).
+    # La pantalla no decide el alcance de la invitación. Los internos solo
+    # pueden ser admin o interno; los externos siempre reciben el rol externo
+    # configurado en la aplicación y deben estar vinculados a un proveedor.
     try:
-        rol = supabase.table("roles").select("nombre").eq("id", datos["rol_id"]).single().execute().data or {}
-        nombre_rol = str(rol.get("nombre") or "").strip().casefold()
+        if tipo_usuario == "INTERNO":
+            rol_id = datos.get("rol_id")
+            if not rol_id:
+                return jsonify({"error": "Debes indicar si el usuario interno será admin o interno."}), 400
+            rol = supabase.table("roles").select("id,nombre").eq("id", rol_id).single().execute().data or {}
+            nombre_rol = str(rol.get("nombre") or "").strip().casefold()
+            if nombre_rol not in {"admin", "interno"}:
+                return jsonify({"error": "Un usuario interno solo puede tener el rol admin o interno."}), 400
+        else:
+            roles_externos = supabase.table("roles").select("id,nombre").execute().data or []
+            # Se conserva la compatibilidad con instalaciones antiguas que
+            # llamaban al rol "proveedor" en vez de "externo".
+            rol = next((fila for fila in roles_externos
+                        if str(fila.get("nombre") or "").strip().casefold() == "externo"), None)
+            if not rol:
+                rol = next((fila for fila in roles_externos if _es_rol_externo(fila.get("nombre"))), None)
+            if not rol:
+                return jsonify({"error": "No existe un rol externo configurado para la invitación."}), 400
+            rol_id = rol["id"]
     except Exception:
         return jsonify({"error": "El rol seleccionado no existe o no está disponible."}), 400
-    es_rol_externo = _es_rol_externo(nombre_rol)
-    if tipo_usuario == "EXTERNO" and not es_rol_externo:
-        return jsonify({"error": "Un proveedor externo debe tener un rol de proveedor."}), 400
-    if tipo_usuario == "INTERNO" and es_rol_externo:
-        return jsonify({"error": "Un usuario interno no puede tener un rol de proveedor."}), 400
     if tipo_usuario == "INTERNO" and datos.get("proveedor_id"):
         return jsonify({"error": "Un usuario interno no debe estar vinculado a un proveedor."}), 400
+
+    # Una invitación que no se aceptó deja una cuenta temporal en Supabase Auth.
+    # Al reenviar, se retira esa cuenta sin perfil y se cancela su registro para
+    # que el índice único por email no bloquee la nueva invitación. Nunca se
+    # elimina una cuenta que ya tenga perfil en ``usuarios``.
+    try:
+        invitaciones_pendientes = (
+            supabase.table("invitaciones_registro")
+            .select("id,supabase_user_id")
+            .ilike("email", email)
+            .in_("estado", ["PENDIENTE", "ENVIADA"])
+            .order("creado_at", desc=True)
+            .execute()
+            .data
+            or []
+        )
+    except Exception as exc:
+        logger.exception("No se pudo comprobar una invitación previa de %s: %s", email, exc)
+        return jsonify({"error": "No se pudo comprobar si existe una invitación previa."}), 500
+
+    for anterior in invitaciones_pendientes:
+        usuario_temporal_id = anterior.get("supabase_user_id")
+        if usuario_temporal_id:
+            try:
+                perfiles = (
+                    supabase.table("usuarios")
+                    .select("id")
+                    .eq("id", usuario_temporal_id)
+                    .limit(1)
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception as exc:
+                logger.exception("No se pudo comprobar el perfil de la invitación previa: %s", exc)
+                return jsonify({"error": "No se pudo comprobar la cuenta asociada a la invitación previa."}), 500
+            if perfiles:
+                return jsonify({"error": "El email ya corresponde a una cuenta activa; no se puede reenviar la invitación."}), 409
+            try:
+                supabase.auth.admin.delete_user(usuario_temporal_id)
+            except Exception as exc:
+                logger.exception("No se pudo retirar la cuenta temporal de %s: %s", email, exc)
+                return jsonify({"error": "No se pudo renovar la cuenta temporal de la invitación anterior."}), 502
+        try:
+            supabase.table("invitaciones_registro").update({"estado": "CANCELADA"}).eq("id", anterior["id"]).execute()
+        except Exception as exc:
+            logger.exception("No se pudo cancelar la invitación previa de %s: %s", email, exc)
+            return jsonify({"error": "No se pudo cancelar la invitación anterior."}), 500
 
     invitacion = {
         "email": email,
         "tipo_usuario": tipo_usuario,
         "proveedor_id": datos.get("proveedor_id") or None,
-        "rol_id": datos.get("rol_id") or None,
+        "rol_id": rol_id,
         "creado_por": (session.get("user") or {}).get("id"),
         "estado": "PENDIENTE",
     }
@@ -2288,7 +2349,7 @@ def api_invitaciones():
             "estado": "ENVIADA",
             "supabase_user_id": respuesta.user.id if respuesta.user else None,
         }).eq("id", creada["id"]).execute()
-        return jsonify({"ok": True, "invitacion": creada}), 201
+        return jsonify({"ok": True, "invitacion": creada, "reenviada": bool(invitaciones_pendientes)}), 201
     except Exception as exc:
         logger.exception("No se pudo enviar invitación a %s: %s", email, exc)
         # La preautorización se conserva para que un administrador pueda
@@ -2335,7 +2396,6 @@ def api_aceptar_registro():
     try:
         supabase.table("usuarios").upsert({
             "id": usuario_auth.id,
-            "email": email,
             "nombre": str(datos.get("nombre") or "").strip(),
             "apellidos": str(datos.get("apellidos") or "").strip(),
             "rol_id": invitacion.get("rol_id"),

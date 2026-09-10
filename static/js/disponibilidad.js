@@ -1,7 +1,7 @@
 // =====================================================================
 // disponibilidad.js - Horarios de muelles (dias multiples)
 // =====================================================================
-// El usuario marca varios dias a la vez (L M X J V S D) y se crea un
+// El usuario marca varios días a la vez y se crea un
 // registro por dia en disponibilidad_muelles. El listado agrupa por
 // muelle + horario y muestra los dias como iniciales con rangos (L-V).
 
@@ -12,10 +12,11 @@
     ? function (k) { return window.GlobalHeader.translate(k); }
     : function (k) { return k; };
 
-  // dia_semana (0=Lunes ... 6=Domingo) -> inicial, como usa el calendario
+  // dia_semana (0=Lunes ... 6=Domingo) -> abreviatura localizada.
   var DIAS = [
-    { v: 0, l: 'L' }, { v: 1, l: 'M' }, { v: 2, l: 'X' }, { v: 3, l: 'J' },
-    { v: 4, l: 'V' }, { v: 5, l: 'S' }, { v: 6, l: 'D' }
+    { v: 0, l: t('Lun') }, { v: 1, l: t('Mar') }, { v: 2, l: t('Mie') },
+    { v: 3, l: t('Jue') }, { v: 4, l: t('Vie') }, { v: 5, l: t('Sab') },
+    { v: 6, l: t('Dom') }
   ];
 
   var muelles = [];        // lista de muelles para el selector múltiple
