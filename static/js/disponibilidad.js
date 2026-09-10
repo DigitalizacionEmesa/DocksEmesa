@@ -14,9 +14,9 @@
 
   // dia_semana (0=Lunes ... 6=Domingo) -> abreviatura localizada.
   var DIAS = [
-    { v: 0, l: t('Lun') }, { v: 1, l: t('Mar') }, { v: 2, l: t('Mie') },
-    { v: 3, l: t('Jue') }, { v: 4, l: t('Vie') }, { v: 5, l: t('Sab') },
-    { v: 6, l: t('Dom') }
+    { v: 0, clave: 'Lun' }, { v: 1, clave: 'Mar' }, { v: 2, clave: 'Mie' },
+    { v: 3, clave: 'Jue' }, { v: 4, clave: 'Vie' }, { v: 5, clave: 'Sab' },
+    { v: 6, clave: 'Dom' }
   ];
 
   var muelles = [];        // lista de muelles para el selector múltiple
@@ -28,6 +28,10 @@
     var div = document.createElement('div');
     div.textContent = texto == null ? '' : String(texto);
     return div.innerHTML;
+  }
+
+  function etiquetaDia(dia) {
+    return t(dia.clave);
   }
 
   function notificar(mensaje, tipo) {
@@ -58,7 +62,9 @@
     for (var i = 1; i <= ordenados.length; i++) {
       var d = ordenados[i];
       if (d === prev + 1) { prev = d; continue; }
-      partes.push(inicio === prev ? DIAS[inicio].l : DIAS[inicio].l + '-' + DIAS[prev].l);
+      partes.push(inicio === prev
+        ? etiquetaDia(DIAS[inicio])
+        : etiquetaDia(DIAS[inicio]) + '-' + etiquetaDia(DIAS[prev]));
       inicio = prev = d;
     }
     return partes.join(', ');
@@ -174,7 +180,7 @@
       var sel = diasSeleccionados.indexOf(d.v) !== -1;
       return '<label class="' + (sel ? 'sel' : '') + '">'
         + '<input type="checkbox" value="' + d.v + '"' + (sel ? ' checked' : '') + '>'
-        + d.l + '</label>';
+        + etiquetaDia(d) + '</label>';
     }).join('');
     // resaltar seleccionados
     Array.prototype.forEach.call(box.querySelectorAll('input'), function (cb) {
@@ -350,6 +356,17 @@
     },
     eliminar: eliminar
   };
+
+  window.addEventListener('languageChanged', function () {
+    // Las etiquetas de días y la ayuda del modo se generan dinámicamente;
+    // al cambiar de idioma hay que pintarlas de nuevo.
+    pintarFilas();
+    var modal = document.getElementById('crudModal');
+    if (modal && modal.classList.contains('active')) {
+      pintarCheckboxes(diasMarcados());
+      aplicarModo();
+    }
+  });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
