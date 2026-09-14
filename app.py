@@ -234,6 +234,16 @@ def _validar_vinculo_proveedor(datos, usuario_id=None):
 def enriquecer_usuario(cliente, user):
     """Anade roles, permisos y accesos al objeto de usuario."""
     user["roles"] = obtener_rol_usuario(cliente, user["id"])
+    try:
+        perfil = (cliente.table("usuarios").select("numero_operario")
+                  .eq("id", user["id"]).limit(1).execute().data or [])
+        numero = perfil[0].get("numero_operario") if perfil else None
+        if numero:
+            user["numero_operario"] = str(numero).strip()
+            user["rol"] = "PLANT_OPERATOR"
+            user["roles"] = ["PLANT_OPERATOR"]
+    except Exception:
+        pass
     user["permisos"] = permisos_de_roles(user["roles"])
     user["plantas"] = obtener_plantas_usuario(cliente, user["id"])
     user["proveedor_id"] = obtener_proveedor_usuario(cliente, user["id"])
@@ -2123,11 +2133,23 @@ def api_usuarios():
             try:
                 cuentas_operario = (
                     supabase.table("operarios_login")
-                    .select("numero_operario,nombre,password_hash,activo")
+                    .select("usuario_id,numero_operario,nombre,password_hash,activo")
                     .execute()
                     .data
                     or []
                 )
+                cuentas_por_usuario = {
+                    str(cuenta.get("usuario_id")): cuenta for cuenta in cuentas_operario
+                    if cuenta.get("usuario_id")
+                }
+                for usuario in usuarios:
+                    cuenta_vinculada = cuentas_por_usuario.get(str(usuario.get("id")))
+                    if cuenta_vinculada:
+                        usuario["numero_operario"] = str(cuenta_vinculada.get("numero_operario") or "").strip()
+                        usuario["es_operario"] = True
+                        usuario["role_name"] = "PLANT_OPERATOR"
+                        usuario["email"] = ""
+                        ids_con_perfil.add(usuario["numero_operario"])
                 censo_operarios = (
                     supabase.table("operarios_corporativos")
                     .select("numero_operario,nombre,activo")
