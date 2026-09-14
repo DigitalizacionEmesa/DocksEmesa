@@ -42,7 +42,8 @@
   function cambiarDia(offset) {
     fechaSel = new Date(fechaSel.getFullYear(), fechaSel.getMonth(), fechaSel.getDate() + offset);
     sincronizarFechaUI();
-    cargarDia();
+    if (vista === 'lista') cargarListado();
+    else cargarDia();
   }
 
   function esDiaPasado() {
@@ -267,7 +268,9 @@
     cont.innerHTML = t('Cargando...');
     try {
       var data = await SupabaseApp.api('/api/reservas/todas');
-      pintarListadoCards(data.reservas || []);
+      var dia = fechaSel ? fmtFecha(fechaSel) : null;
+      var reservas = (data.reservas || []).filter(function (r) { return !dia || r.fecha === dia; });
+      pintarListadoCards(reservas);
     } catch (err) {
       console.error('Error cargando listado:', err);
       cont.innerHTML = t('Error al cargar') + ' · ' + esc(mensajeErrorAmigable(err));
@@ -374,7 +377,8 @@
       if (e.target.value) {
         fechaSel = new Date(e.target.value + 'T00:00:00');
         sincronizarFechaUI();
-        cargarDia();
+        if (vista === 'lista') cargarListado();
+        else cargarDia();
       }
     });
     document.getElementById('btnPrevDia').addEventListener('click', function () { cambiarDia(-1); });
@@ -382,19 +386,21 @@
     document.getElementById('btnHoy').addEventListener('click', function () {
       fechaSel = new Date();
       sincronizarFechaUI();
-      cargarDia();
+      if (vista === 'lista') cargarListado();
+      else cargarDia();
     });
-    // Bloquea/desbloquea el selector de fecha (listado vs visual)
+    // El selector de fecha permanece disponible en ambas vistas para poder
+    // localizar rápidamente las reservas de un día concreto.
     function bloquearFecha(bloqueada) {
       var nav = document.querySelector('.fecha-nav');
-      if (nav) nav.classList.toggle('bloqueada', bloqueada);
+      if (nav) nav.classList.toggle('bloqueada', false);
       var controles = [
         document.getElementById('btnPrevDia'),
         document.getElementById('btnNextDia'),
         document.getElementById('btnHoy'),
         document.getElementById('fechaSel')
       ];
-      controles.forEach(function (el) { if (el) el.disabled = bloqueada; });
+      controles.forEach(function (el) { if (el) el.disabled = false; });
     }
 
     document.getElementById('btnVistaVisual').addEventListener('click', function () {
@@ -408,7 +414,7 @@
       vista = 'lista';
       document.getElementById('btnVistaLista').classList.add('activo');
       document.getElementById('btnVistaVisual').classList.remove('activo');
-      bloquearFecha(true);
+      bloquearFecha(false);
       cargarListado();
     });
 
