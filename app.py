@@ -82,12 +82,14 @@ PERMISOS_PROVEEDOR = frozenset({
 # queda limitado a las plantas que tenga asignadas en ``usuario_plantas``.
 PERMISOS_OPERARIO = frozenset({
     "menu:reservas", "menu:muelles",
-    "muelles:ver", "reservas:ver", "reservas:actualizar_estado",
+    "muelles:ver", "reservas:ver", "reservas:crear", "reservas:ver_propias",
+    "reservas:cancelar_propias",
 })
 
 PERMISOS_POR_ROL = {
     "admin": PERMISOS_ADMIN,
     "interno": PERMISOS_INTERNO,
+    "internal": PERMISOS_INTERNO,
     "proveedor": PERMISOS_PROVEEDOR,
     "externo": PERMISOS_PROVEEDOR,  # alias si el rol se llama 'externo'
     "PLANT_OPERATOR": PERMISOS_OPERARIO,
@@ -159,7 +161,7 @@ def obtener_plantas_usuario(cliente, user_id):
     nombre_rol, _ = _obtener_nombre_rol(cliente, user_id)
     if not nombre_rol:
         return []
-    if nombre_rol in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
+    if nombre_rol in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
         try:
             todas = cliente.table("plantas").select("id").execute().data
             return [p["id"] for p in (todas or [])]
@@ -181,6 +183,21 @@ def obtener_plantas_usuario(cliente, user_id):
         return [a["planta_id"] for a in (asignadas or [])]
     except Exception:
         return []
+
+
+def _es_usuario_operario(cliente, user_id):
+    """Indica si el perfil está vinculado a un número de operario.
+
+    Se consulta el perfil, en vez del rol, porque instalaciones antiguas
+    pueden conservar ``interno`` como rol de un operario. En ese caso el
+    número de operario sigue siendo la fuente de verdad para el alcance.
+    """
+    try:
+        perfil = (cliente.table("usuarios").select("numero_operario")
+                  .eq("id", user_id).limit(1).execute().data or [])
+        return bool(perfil and str(perfil[0].get("numero_operario") or "").strip())
+    except Exception:
+        return False
 
 
 def obtener_proveedor_usuario(cliente, user_id):
@@ -744,7 +761,8 @@ def api_stats():
     try:
         user = session.get("user")
         rol = _obtener_nombre_rol(supabase, user["id"])[0] if user else None
-        es_admin = rol in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN")
+        es_operario = bool(user and _es_usuario_operario(supabase, user["id"]))
+        es_admin = (not es_operario) and rol in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN")
 
         hoy_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -798,6 +816,9 @@ def api_muelles():
     """Muelles con sus reservas de hoy (usa service role para evitar RLS)."""
     if not supabase:
         return jsonify({"error": "Supabase no configurado"}), 500
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "No autenticado"}), 401
 
     try:
         hoy_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -806,6 +827,10 @@ def api_muelles():
                    .select("*")
                    .order("planta,nave,muelle")
                    .execute().data)
+        ids_visibles = set(obtener_plantas_usuario(supabase, user["id"]) or [])
+        # La vista incluye planta_id; filtrar aquí evita que el panel exponga
+        # muelles de plantas no asignadas al operador.
+        muelles = [m for m in (muelles or []) if m.get("planta_id") in ids_visibles]
 
         reservas = (supabase.table("reservas")
                     .select("id,muelle_id,hora_inicio,hora_fin,estado,tipo")
@@ -1071,8 +1096,12 @@ def _muelles_de_planta(planta_id, nave_id=None, muelle_id=None, ids_permitidos=N
 
 def _verificar_acceso_planta(user_id, planta_id):
     """Devuelve True si el usuario (no admin) tiene acceso a la planta."""
+    # Un operario siempre queda limitado a usuario_plantas, aunque su rol
+    # histórico sea ``interno``.
+    if _es_usuario_operario(supabase, user_id):
+        return planta_id in set(obtener_plantas_usuario(supabase, user_id) or [])
     rol = _obtener_nombre_rol(supabase, user_id)[0]
-    if rol in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
+    if rol in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
         return True
     ids_visibles = set(obtener_plantas_usuario(supabase, user_id) or [])
     return bool(ids_visibles) and planta_id in ids_visibles
@@ -1087,8 +1116,12 @@ def _ids_muelles_proveedor(user_id, cliente=None):
     consultar ni reservar ningún muelle.
     """
     cli = cliente or supabase
+    # Los operarios no son proveedores: tienen todos los muelles de sus
+    # plantas asignadas. La autorización de planta se comprueba aparte.
+    if _es_usuario_operario(cli, user_id):
+        return None
     rol = _obtener_nombre_rol(cli, user_id)[0]
-    if rol in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
+    if rol in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
         return None
     prov = obtener_proveedor_usuario(cli, user_id)
     if not prov:
@@ -1486,7 +1519,7 @@ def api_reservas_cancelar(rid):
             return jsonify({"error": "Reserva no encontrada."}), 404
 
         rol = _obtener_nombre_rol(supabase, user["id"])[0]
-        if rol not in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN") and res["usuario_id"] != user["id"]:
+        if rol not in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN") and res["usuario_id"] != user["id"]:
             return jsonify({"error": "No puedes cancelar una reserva de otro usuario."}), 403
 
         if _estado_reserva(res) == "completado":
@@ -1525,7 +1558,7 @@ def api_reservas_modificar(rid):
             return jsonify({"error": "Reserva no encontrada."}), 404
 
         rol = _obtener_nombre_rol(supabase, user["id"])[0]
-        if rol not in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN") and res["usuario_id"] != user["id"]:
+        if rol not in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN") and res["usuario_id"] != user["id"]:
             return jsonify({"error": "No puedes modificar una reserva de otro usuario."}), 403
 
         if _estado_reserva(res) == "completado":
@@ -1612,7 +1645,7 @@ def api_reservas_todas():
         return jsonify({"error": "No autenticado"}), 401
     try:
         rol = _obtener_nombre_rol(supabase, user["id"])[0]
-        if rol not in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
+        if rol not in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
             return jsonify({"error": "No autorizado"}), 403
 
         reservas = (supabase.table("reservas")
@@ -1794,7 +1827,7 @@ def api_excepciones_lista():
     if not user:
         return jsonify({"error": "No autenticado"}), 401
     rol = _obtener_nombre_rol(supabase, user["id"])[0]
-    if rol not in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
+    if rol not in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
         return jsonify({"error": "No autorizado"}), 403
 
     if request.method == "GET":
@@ -1843,7 +1876,7 @@ def api_excepciones_item(eid):
     if not user:
         return jsonify({"error": "No autenticado"}), 401
     rol = _obtener_nombre_rol(supabase, user["id"])[0]
-    if rol not in ("admin", "interno", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
+    if rol not in ("admin", "interno", "internal", "DEVELOPER", "SYSTEM_ADMIN", "PLANT_ADMIN"):
         return jsonify({"error": "No autorizado"}), 403
 
     try:
@@ -2313,7 +2346,7 @@ def api_invitaciones():
                 return jsonify({"error": "Debes indicar si el usuario interno será admin o interno."}), 400
             rol = supabase.table("roles").select("id,nombre").eq("id", rol_id).single().execute().data or {}
             nombre_rol = str(rol.get("nombre") or "").strip().casefold()
-            if nombre_rol not in {"admin", "interno"}:
+            if nombre_rol not in {"admin", "interno", "internal"}:
                 return jsonify({"error": "Un usuario interno solo puede tener el rol admin o interno."}), 400
         else:
             roles_externos = supabase.table("roles").select("id,nombre").execute().data or []
