@@ -155,7 +155,7 @@
       var esYo = yo && yo.id === u.id;
       var operario = u.numero_operario || "\u2014";
       var acciones = u.es_operario
-        ? "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.gestionarOperarios()\">" + t("Gestionar") + "</button>"
+        ? "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editarPlantasOperario('" + encodeURIComponent(u.numero_operario) + "')\">" + t("Editar") + "</button>"
         : "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editar('" + u.id + "')\">\u270f " + t("Editar") + "</button>" + (esYo ? "" : "<button class=\"action-button btn-del\" onclick=\"window.Usuarios.eliminar('" + u.id + "')\">\ud83d\uddd1 " + t("Eliminar") + "</button>");
       var email = esOperarioListado(u) ? "—" : (u.email || "—");
       return "<tr><td><strong>" + esc(nombre) + "</strong></td><td>" + esc(email) + "</td><td>" + esc(operario) + "</td><td><span class=\"badge badge-in_progress\">" + esc(rolNombre) + "</span></td><td>" + esc(deptoNombre) + "</td><td>" + esc(provNombre) + "</td><td style=\"max-width:180px;\">" + esc(plantasTxt) + "</td><td>" + activoHtml + "</td><td class=\"acciones-cell\">" + acciones + "</td></tr>";
@@ -308,7 +308,7 @@
       var plantasTxt = (operario.plantas && operario.plantas.length)
         ? esc(operario.plantas.join(", "))
         : "<span style=\"color:#999;\">—</span>";
-      var botonPlantas = "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editarPlantasOperario('" + numero + "')\">" + t("Plantas") + "</button>";
+      var botonPlantas = "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editarPlantasOperario('" + numero + "')\">" + t("Editar") + "</button>";
       var acciones = operario.activo === false
         ? "—"
         : (operario.tiene_cuenta
@@ -339,15 +339,22 @@
 
   function abrirPlantasOperario(numero, nombre) {
     operarioPlantasActual = { numero: numero, nombre: nombre };
-    document.getElementById("plantasOperarioTitulo").textContent = t("Plantas del operario");
+    document.getElementById("plantasOperarioTitulo").textContent = t("Editar operario");
     document.getElementById("plantasOperarioTexto").textContent =
       t("Selecciona las plantas a las que tendrá acceso") + " " + nombre + " (" + numero + ").";
     var box = document.getElementById("plantasOperarioBox");
+    var roleSelect = document.getElementById("plantasOperarioRol");
+    var rolesInternos = roles.filter(function(r) { return !esRolExterno(r); });
+    roleSelect.innerHTML = rolesInternos.map(function(r) {
+      return "<option value=\"" + r.id + "\">" + esc(r.nombre) + "</option>";
+    }).join("");
     box.innerHTML = "<div style=\"color:#888;font-size:.85rem;\">" + t("Cargando...") + "</div>";
     document.getElementById("plantasOperarioModal").classList.add("active");
     SupabaseApp.api("/api/admin/operarios/" + encodeURIComponent(numero) + "/plantas")
       .then(function(data) {
         var actuales = data.planta_ids || [];
+        var rolActual = data.rol_id || ((roles.find(function(r) { return String(r.nombre).toUpperCase() === "PLANT_OPERATOR"; }) || {}).id);
+        if (rolActual) roleSelect.value = rolActual;
         box.innerHTML = plantas.length
           ? plantas.map(function(p) {
               var marcada = actuales.indexOf(p.id) !== -1 ? " checked" : "";
@@ -369,12 +376,13 @@
   async function guardarPlantasOperario() {
     if (!operarioPlantasActual) return;
     var ids = Array.prototype.slice.call(document.querySelectorAll(".op-chk:checked")).map(function(c) { return c.value; });
+    var rolId = document.getElementById("plantasOperarioRol").value;
     var btn = document.getElementById("plantasOperarioGuardar");
     btn.disabled = true;
     try {
       await SupabaseApp.api("/api/admin/operarios/" + encodeURIComponent(operarioPlantasActual.numero) + "/plantas", {
         method: "PUT",
-        body: { planta_ids: ids }
+        body: { planta_ids: ids, rol_id: rolId }
       });
       cerrarPlantasOperario();
       await abrirModalOperarios();

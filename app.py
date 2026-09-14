@@ -2669,11 +2669,23 @@ def api_operario_plantas(numero_operario):
                 supabase.table("usuario_plantas").select("planta_id")
                 .eq("usuario_id", perfil["id"]).execute().data or []
             )
-            return jsonify({"usuario_id": perfil["id"], "planta_ids": [a["planta_id"] for a in asignadas]})
+            return jsonify({
+                "usuario_id": perfil["id"],
+                "planta_ids": [a["planta_id"] for a in asignadas],
+                "rol_id": perfil.get("rol_id") or perfil.get("role_id"),
+            })
 
         perfil = _garantizar_perfil_operario(numero)
         usuario_id = perfil["id"]
-        ids = list(dict.fromkeys((request.json or {}).get("planta_ids") or []))
+        body = request.json or {}
+        ids = list(dict.fromkeys(body.get("planta_ids") or []))
+        rol_id = body.get("rol_id")
+        if rol_id:
+            rol = (supabase.table("roles").select("*")
+                   .eq("id", rol_id).limit(1).execute().data or [])
+            if not rol or _es_rol_externo(rol[0].get("nombre") or rol[0].get("name")):
+                return jsonify({"error": "El operario debe tener un rol interno."}), 400
+            supabase.table("usuarios").update({"rol_id": rol_id}).eq("id", usuario_id).execute()
         validos = []
         for planta_id in ids:
             try:
