@@ -98,7 +98,6 @@
     var plantas = estructura.plantas;
     var avisoTxt = '';
     if (!plantas.length) avisoTxt = t('No tienes plantas asignadas. Contacta con un administrador.');
-    else if (plantas.length === 1) avisoTxt = t('Solo puedes ver tu planta asignada.');
     aviso.style.display = avisoTxt ? 'block' : 'none';
     aviso.textContent = avisoTxt;
 

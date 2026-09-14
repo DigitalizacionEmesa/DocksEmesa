@@ -84,8 +84,10 @@
     // Ver Calendario: solo admin
     if (!Permisos.tieneRol('admin')) ocultar('sidebarCalendario');
 
-    // Configuracion: solo con acceso a configuracion
-    if (!Permisos.tieneAccesoConfig()) ocultar('tab-configuracion');
+    // Los operarios trabajan únicamente con reservas y muelles; no necesitan
+    // ver el acceso a configuración en el menú del dashboard.
+    if (Permisos.tieneRol('PLANT_OPERATOR')) ocultar('tab-configuracion');
+    else if (!Permisos.tieneAccesoConfig()) ocultar('tab-configuracion');
   }
 
   // ------------------------------------------------------------------
