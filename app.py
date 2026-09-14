@@ -144,6 +144,18 @@ def obtener_plantas_usuario(cliente, user_id):
     la planta no es una segunda autorización: se deduce de los muelles que el
     proveedor tiene asignados. Así no hay configuraciones contradictorias.
     """
+    # La identidad corporativa de operario siempre usa asignación explícita,
+    # aunque una instalación antigua conserve el rol ``interno`` en su perfil.
+    try:
+        perfil = (cliente.table("usuarios").select("numero_operario")
+                  .eq("id", user_id).limit(1).execute().data or [])
+        if perfil and perfil[0].get("numero_operario"):
+            asignadas = (cliente.table("usuario_plantas").select("planta_id")
+                         .eq("usuario_id", user_id).execute().data or [])
+            return [a["planta_id"] for a in asignadas]
+    except Exception:
+        pass
+
     nombre_rol, _ = _obtener_nombre_rol(cliente, user_id)
     if not nombre_rol:
         return []
@@ -2085,16 +2097,17 @@ def api_usuarios():
 
                 usuarios.append({
                     "id": u["id"],
-                    "email": emails.get(u["id"]) or u.get("email", ""),
+                    "email": "" if u.get("numero_operario") else (emails.get(u["id"]) or u.get("email", "")),
                     "nombre": nom,
                     "apellidos": ape,
                     "rol_id": rol_id,
-                    "role_name": role_name,
+                    "role_name": "PLANT_OPERATOR" if u.get("numero_operario") else role_name,
                     "proveedor_id": prov_id,
                     "departamento_id": depto_id,
                     "numero_operario": u.get("numero_operario") or "",
                     "origen_operario": u.get("origen_operario") or "",
                     "tipo_usuario_forzado": u.get("tipo_usuario_forzado") or "",
+                    "es_operario": bool(u.get("numero_operario")),
                     "activo": u.get("activo") if "activo" in u else u.get("active", True),
                 })
 
@@ -2131,7 +2144,7 @@ def api_usuarios():
                         "nombre": partes[0],
                         "apellidos": partes[1] if len(partes) > 1 else "",
                         "rol_id": None,
-                        "role_name": "interno",
+                        "role_name": "PLANT_OPERATOR",
                         "proveedor_id": None,
                         "departamento_id": None,
                         "numero_operario": numero,
@@ -2141,6 +2154,10 @@ def api_usuarios():
                     })
             except Exception as exc:
                 logger.warning("No se pudieron añadir operarios al listado de usuarios: %s", exc)
+            usuarios.sort(key=lambda fila: " ".join(
+                str(fila.get(campo) or "").strip()
+                for campo in ("nombre", "apellidos")
+            ).casefold())
             return jsonify({"usuarios": usuarios})
         except Exception as e:
             return jsonify({"error": str(e)}), 500

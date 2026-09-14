@@ -139,7 +139,7 @@
     var yo = window.Auth ? Auth.getCurrentUser() : null;
     tbody.innerHTML = datos.map(function(u) {
       var nombre = ((u.nombre || "") + " " + (u.apellidos || "")).trim() || "\u2014";
-      var rolNombre = u.role_name ? rolTxt(u.role_name) : "\u2014";
+      var rolNombre = esOperarioListado(u) ? "PLANT_OPERATOR" : (u.role_name ? rolTxt(u.role_name) : "\u2014");
       var deptoNombre = "\u2014";
       if (u.departamento_id) { var d = departamentos.find(function(x) { return x.id === u.departamento_id; }); deptoNombre = d ? d.nombre : u.departamento_id.slice(0,8); }
       var provNombre = "\u2014";
@@ -155,9 +155,10 @@
       var esYo = yo && yo.id === u.id;
       var operario = u.numero_operario || "\u2014";
       var acciones = u.es_operario
-        ? "<span style=\"color:#667;\">" + t("Gestionar en Operarios") + "</span>"
+        ? "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.gestionarOperarios()\">" + t("Gestionar") + "</button>"
         : "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editar('" + u.id + "')\">\u270f " + t("Editar") + "</button>" + (esYo ? "" : "<button class=\"action-button btn-del\" onclick=\"window.Usuarios.eliminar('" + u.id + "')\">\ud83d\uddd1 " + t("Eliminar") + "</button>");
-      return "<tr><td><strong>" + esc(nombre) + "</strong></td><td>" + esc(u.email || "\u2014") + "</td><td>" + esc(operario) + "</td><td><span class=\"badge badge-in_progress\">" + esc(rolNombre) + "</span></td><td>" + esc(deptoNombre) + "</td><td>" + esc(provNombre) + "</td><td style=\"max-width:180px;\">" + esc(plantasTxt) + "</td><td>" + activoHtml + "</td><td class=\"acciones-cell\">" + acciones + "</td></tr>";
+      var email = esOperarioListado(u) ? "—" : (u.email || "—");
+      return "<tr><td><strong>" + esc(nombre) + "</strong></td><td>" + esc(email) + "</td><td>" + esc(operario) + "</td><td><span class=\"badge badge-in_progress\">" + esc(rolNombre) + "</span></td><td>" + esc(deptoNombre) + "</td><td>" + esc(provNombre) + "</td><td style=\"max-width:180px;\">" + esc(plantasTxt) + "</td><td>" + activoHtml + "</td><td class=\"acciones-cell\">" + acciones + "</td></tr>";
     }).join("");
     if (window.GlobalHeader) window.GlobalHeader.translatePage();
   }
@@ -555,7 +556,6 @@
     document.getElementById("altaExterno").addEventListener("click", function() { cerrarAltaAcceso(); abrirModalInvitacion("EXTERNO"); });
     document.getElementById("altaOperario").addEventListener("click", function() { cerrarAltaAcceso(); abrirModalOperarios(); });
     document.getElementById("btnNuevo").addEventListener("click", function() { cerrarAltaAcceso(); abrirModal(null); });
-    document.getElementById("btnOperarios").addEventListener("click", abrirModalOperarios);
     var botonSincronizar = document.getElementById("btnSincronizarOperarios");
     if (botonSincronizar) botonSincronizar.addEventListener("click", sincronizarOperarios);
     document.getElementById("crudModalClose").addEventListener("click", cerrarModal);
@@ -594,6 +594,7 @@
   window.Usuarios = {
     editar: function(id) { abrirModal(usuarios.find(function(u) { return u.id === id; })); },
     eliminar: eliminar,
+    gestionarOperarios: abrirModalOperarios,
     crearCuentaOperario: function(numero) { abrirCredencialOperario(numero, "crear"); },
     restablecerContrasenaOperario: function(numero) { abrirCredencialOperario(numero, "restablecer"); },
     editarPlantasOperario: editarPlantasOperario
