@@ -51,6 +51,15 @@
     return t(map[nombre] || nombre);
   }
 
+  function rolClase(nombre) {
+    var normalizado = String(nombre || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+    if (normalizado === "plant_operator" || normalizado === "plantoperator") return "badge-role-operator";
+    if (normalizado === "admin" || normalizado === "system_admin" || normalizado === "developer") return "badge-role-admin";
+    if (normalizado === "interno" || normalizado === "internal") return "badge-role-internal";
+    if (["proveedor", "externo", "supplier", "supplier_user", "external"].indexOf(normalizado) !== -1) return "badge-role-external";
+    return "badge-role-default";
+  }
+
   async function cargarMaestros() {
     try {
       var res = await Promise.all([
@@ -154,11 +163,11 @@
       var activoHtml = u.activo !== false ? "<span class=\"badge badge-completed\">" + t("Sí") + "</span>" : "<span class=\"badge badge-cancelled\">" + t("No") + "</span>";
       var esYo = yo && yo.id === u.id;
       var operario = u.numero_operario || "\u2014";
-      var acciones = u.es_operario
+      var acciones = esOperarioListado(u)
         ? "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editarPlantasOperario('" + encodeURIComponent(u.numero_operario) + "')\">" + t("Editar") + "</button>"
         : "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editar('" + u.id + "')\">\u270f " + t("Editar") + "</button>" + (esYo ? "" : "<button class=\"action-button btn-del\" onclick=\"window.Usuarios.eliminar('" + u.id + "')\">\ud83d\uddd1 " + t("Eliminar") + "</button>");
       var email = esOperarioListado(u) ? "—" : (u.email || "—");
-      return "<tr><td><strong>" + esc(nombre) + "</strong></td><td>" + esc(email) + "</td><td>" + esc(operario) + "</td><td><span class=\"badge badge-in_progress\">" + esc(rolNombre) + "</span></td><td>" + esc(deptoNombre) + "</td><td>" + esc(provNombre) + "</td><td style=\"max-width:180px;\">" + esc(plantasTxt) + "</td><td>" + activoHtml + "</td><td class=\"acciones-cell\">" + acciones + "</td></tr>";
+      return "<tr><td><strong>" + esc(nombre) + "</strong></td><td>" + esc(email) + "</td><td>" + esc(operario) + "</td><td><span class=\"badge " + rolClase(rolNombre) + "\">" + esc(rolNombre) + "</span></td><td>" + esc(deptoNombre) + "</td><td>" + esc(provNombre) + "</td><td style=\"max-width:180px;\">" + esc(plantasTxt) + "</td><td>" + activoHtml + "</td><td class=\"acciones-cell\">" + acciones + "</td></tr>";
     }).join("");
     if (window.GlobalHeader) window.GlobalHeader.translatePage();
   }
@@ -592,7 +601,14 @@
   }
 
   window.Usuarios = {
-    editar: function(id) { abrirModal(usuarios.find(function(u) { return u.id === id; })); },
+    editar: function(id) {
+      var usuario = usuarios.find(function(u) { return u.id === id; });
+      if (usuario && esOperarioListado(usuario)) {
+        abrirPlantasOperario(usuario.numero_operario, ((usuario.nombre || "") + " " + (usuario.apellidos || "")).trim());
+      } else {
+        abrirModal(usuario);
+      }
+    },
     eliminar: eliminar,
     gestionarOperarios: abrirModalOperarios,
     crearCuentaOperario: function(numero) { abrirCredencialOperario(numero, "crear"); },
