@@ -250,17 +250,29 @@ def _validar_vinculo_proveedor(datos, usuario_id=None):
 
 def enriquecer_usuario(cliente, user):
     """Anade roles, permisos y accesos al objeto de usuario."""
-    user["roles"] = obtener_rol_usuario(cliente, user["id"])
+    # Algunas identidades técnicas de operario se autentican con el UUID de
+    # Auth, mientras que las asignaciones operativas apuntan al UUID de
+    # public.usuarios. Resolver por número evita que pueda ver la planta pero
+    # que la reserva se intente insertar con un usuario_id distinto.
+    perfil = None
     try:
         perfil = (cliente.table("usuarios").select("numero_operario")
                   .eq("id", user["id"]).limit(1).execute().data or [])
-        numero = perfil[0].get("numero_operario") if perfil else None
+        if not perfil and user.get("numero_operario"):
+            perfil = (cliente.table("usuarios").select("id,numero_operario")
+                      .eq("numero_operario", str(user["numero_operario"]).strip())
+                      .limit(1).execute().data or [])
+            if perfil and perfil[0].get("id"):
+                user["id"] = perfil[0]["id"]
+        numero = perfil[0].get("numero_operario") if perfil else user.get("numero_operario")
         if numero:
             user["numero_operario"] = str(numero).strip()
             user["rol"] = "PLANT_OPERATOR"
             user["roles"] = ["PLANT_OPERATOR"]
     except Exception:
         pass
+    if "roles" not in user:
+        user["roles"] = obtener_rol_usuario(cliente, user["id"])
     user["permisos"] = permisos_de_roles(user["roles"])
     user["plantas"] = obtener_plantas_usuario(cliente, user["id"])
     user["proveedor_id"] = obtener_proveedor_usuario(cliente, user["id"])
@@ -598,6 +610,7 @@ def _login_operario_supabase_auth(num_operario, password):
         sesion = respuesta.session
         user = {
             "id": respuesta.user.id,
+            "numero_operario": str(num_operario).strip(),
             "email": None,
             "nombre": _construir_nombre_perfil(perfil) or str(num_operario),
             "rol": _obtener_nombre_rol(supabase, respuesta.user.id)[0] or "interno",
