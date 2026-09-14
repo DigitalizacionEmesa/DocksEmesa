@@ -322,7 +322,7 @@
         ? "—"
         : (operario.tiene_cuenta
           ? botonPlantas
-          : "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.crearCuentaOperario('" + numero + "')\">" + t("Crear cuenta") + "</button>" + botonPlantas);
+          : "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.crearCuentaOperario('" + numero + "')\">" + t("Crear cuenta") + "</button>");
       return "<tr><td>" + esc(operario.numero_operario) + "</td><td><strong>" + esc(operario.nombre) + "</strong></td><td>" + estadoOperario(operario) + "</td><td>" + cuenta + "</td><td style=\"max-width:200px;\">" + plantasTxt + "</td><td class=\"acciones-cell\">" + acciones + "</td></tr>";
     }).join("");
   }
