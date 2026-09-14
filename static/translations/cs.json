@@ -406,5 +406,9 @@
   "Confirmar contraseña": "Potvrdit heslo",
   "Repite la contraseña": "Zopakujte heslo",
   "Opcional": "Volitelné",
-  "📋 Informe de reserva": "📋 Přehled rezervace"
+  "📋 Informe de reserva": "📋 Přehled rezervace",
+  "Plantas del operario": "Závody operátora",
+  "Selecciona las plantas a las que tendrá acceso": "Vyberte závody, ke kterým bude mít přístup",
+  "No se pudieron cargar las plantas.": "Závody se nepodařilo načíst.",
+  "Plantas actualizadas": "Závody byly aktualizovány"
 }

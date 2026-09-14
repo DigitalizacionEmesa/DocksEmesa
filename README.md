@@ -91,14 +91,30 @@ venv\Scripts\activate          # Windows
 # 2. Instalar dependencias
 pip install -r requirements.txt
 
-# 3. Configurar credenciales en config.py (o variables de entorno)
-#    SUPABASE_URL = "https://TU-PROYECTO.supabase.co"
-#    SUPABASE_KEY = "tu-servicio-o-anon-key"
+# 3. Crear el archivo local de variables (no se versiona)
+Copy-Item .env.example .env
+# Completa en .env SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_KEY y SECRET_KEY.
+# La clave SUPABASE_KEY es exclusivamente la Secret key de servidor.
 
-# 4. Ejecutar
+# 4. Verificar, sin mostrar ninguna clave
+venv\Scripts\python.exe tools\verificar_entorno.py
+
+# 5. Ejecutar
 python app.py
 # → http://127.0.0.1:5000
 ```
+
+### Configuración local segura
+
+`.env` es exclusivamente local y no se debe añadir al commit. `SUPABASE_KEY`
+es una clave secreta de servidor: no se copia en JavaScript, correos, issues ni
+capturas. `SUPABASE_ANON_KEY` es la clave pública usada por Supabase Auth.
+
+Para trabajar con producción en local, usa la URL y ambas claves del mismo
+proyecto de Supabase. En Render configura las mismas variables en el servicio,
+no dentro del repositorio. Si no vas a usar el Data Lake corporativo, deja
+`DATALAKE_ENABLED=0`; al activarlo se requieren todas las variables
+`DATALAKE_*` y no hay valores implícitos en el código.
 
 ## 🔐 Integración con Supabase
 

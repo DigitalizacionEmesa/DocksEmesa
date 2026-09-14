@@ -21,6 +21,7 @@
   var editandoId = null;
   var operarios = [];
   var accionCredencialOperario = null;
+  var operarioPlantasActual = null;
   var filtroRapido = "todos";
 
   function esc(texto) {
@@ -295,7 +296,7 @@
   function pintarOperarios() {
     var tbody = document.getElementById("operariosTbody");
     if (!operarios.length) {
-      tbody.innerHTML = "<tr><td colspan=\"5\" class=\"empty-state\">" + t("No hay operarios sincronizados") + "</td></tr>";
+      tbody.innerHTML = "<tr><td colspan=\"6\" class=\"empty-state\">" + t("No hay operarios sincronizados") + "</td></tr>";
       return;
     }
     tbody.innerHTML = operarios.map(function(operario) {
@@ -303,12 +304,16 @@
       var cuenta = operario.tiene_cuenta
         ? "<span class=\"badge badge-completed\">" + t("Sí") + "</span>"
         : "<span class=\"badge badge-cancelled\">" + t("No") + "</span>";
+      var plantasTxt = (operario.plantas && operario.plantas.length)
+        ? esc(operario.plantas.join(", "))
+        : "<span style=\"color:#999;\">—</span>";
+      var botonPlantas = "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.editarPlantasOperario('" + numero + "')\">" + t("Plantas") + "</button>";
       var acciones = operario.activo === false
         ? "—"
         : (operario.tiene_cuenta
-          ? "—"
-          : "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.crearCuentaOperario('" + numero + "')\">" + t("Crear cuenta") + "</button>");
-      return "<tr><td>" + esc(operario.numero_operario) + "</td><td><strong>" + esc(operario.nombre) + "</strong></td><td>" + estadoOperario(operario) + "</td><td>" + cuenta + "</td><td class=\"acciones-cell\">" + acciones + "</td></tr>";
+          ? botonPlantas
+          : "<button class=\"action-button btn-edit\" onclick=\"window.Usuarios.crearCuentaOperario('" + numero + "')\">" + t("Crear cuenta") + "</button>" + botonPlantas);
+      return "<tr><td>" + esc(operario.numero_operario) + "</td><td><strong>" + esc(operario.nombre) + "</strong></td><td>" + estadoOperario(operario) + "</td><td>" + cuenta + "</td><td style=\"max-width:200px;\">" + plantasTxt + "</td><td class=\"acciones-cell\">" + acciones + "</td></tr>";
     }).join("");
   }
 
@@ -316,19 +321,74 @@
     document.getElementById("operariosModal").classList.add("active");
     document.getElementById("busquedaOperarios").value = "";
     var tbody = document.getElementById("operariosTbody");
-    tbody.innerHTML = "<tr><td colspan=\"5\" class=\"empty-state\">" + t("Cargando...") + "</td></tr>";
+    tbody.innerHTML = "<tr><td colspan=\"6\" class=\"empty-state\">" + t("Cargando...") + "</td></tr>";
     try {
       var data = await SupabaseApp.api("/api/admin/operarios");
       operarios = data.operarios || [];
       pintarOperarios();
     } catch (err) {
-      tbody.innerHTML = "<tr><td colspan=\"5\" class=\"empty-state\">" + t("Error al cargar") + "</td></tr>";
+      tbody.innerHTML = "<tr><td colspan=\"6\" class=\"empty-state\">" + t("Error al cargar") + "</td></tr>";
       notificar(t("Error") + ": " + mensajeErrorAmigable(err), "error");
     }
   }
 
   function cerrarModalOperarios() {
     document.getElementById("operariosModal").classList.remove("active");
+  }
+
+  function abrirPlantasOperario(numero, nombre) {
+    operarioPlantasActual = { numero: numero, nombre: nombre };
+    document.getElementById("plantasOperarioTitulo").textContent = t("Plantas del operario");
+    document.getElementById("plantasOperarioTexto").textContent =
+      t("Selecciona las plantas a las que tendrá acceso") + " " + nombre + " (" + numero + ").";
+    var box = document.getElementById("plantasOperarioBox");
+    box.innerHTML = "<div style=\"color:#888;font-size:.85rem;\">" + t("Cargando...") + "</div>";
+    document.getElementById("plantasOperarioModal").classList.add("active");
+    SupabaseApp.api("/api/admin/operarios/" + encodeURIComponent(numero) + "/plantas")
+      .then(function(data) {
+        var actuales = data.planta_ids || [];
+        box.innerHTML = plantas.length
+          ? plantas.map(function(p) {
+              var marcada = actuales.indexOf(p.id) !== -1 ? " checked" : "";
+              return "<label><input type=\"checkbox\" class=\"op-chk\" value=\"" + p.id + "\"" + marcada + ">" + esc(p.nombre) + "</label>";
+            }).join("")
+          : "<div style=\"color:#888;font-size:.85rem;\">" + t("No hay plantas creadas todavia.") + "</div>";
+        if (window.GlobalHeader) window.GlobalHeader.translatePage();
+      })
+      .catch(function() {
+        box.innerHTML = "<div style=\"color:#c00;font-size:.85rem;\">" + t("No se pudieron cargar las plantas.") + "</div>";
+      });
+  }
+
+  function cerrarPlantasOperario() {
+    document.getElementById("plantasOperarioModal").classList.remove("active");
+    operarioPlantasActual = null;
+  }
+
+  async function guardarPlantasOperario() {
+    if (!operarioPlantasActual) return;
+    var ids = Array.prototype.slice.call(document.querySelectorAll(".op-chk:checked")).map(function(c) { return c.value; });
+    var btn = document.getElementById("plantasOperarioGuardar");
+    btn.disabled = true;
+    try {
+      await SupabaseApp.api("/api/admin/operarios/" + encodeURIComponent(operarioPlantasActual.numero) + "/plantas", {
+        method: "PUT",
+        body: { planta_ids: ids }
+      });
+      cerrarPlantasOperario();
+      await abrirModalOperarios();
+      notificar(t("Plantas actualizadas"), "success");
+    } catch (err) {
+      notificar(t("Error") + ": " + mensajeErrorAmigable(err), "error");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function editarPlantasOperario(numeroCodificado) {
+    var numero = decodeURIComponent(numeroCodificado);
+    var operario = operarios.find(function(item) { return String(item.numero_operario) === String(numero); });
+    abrirPlantasOperario(numero, operario ? operario.nombre : numero);
   }
 
   function abrirCredencialOperario(numeroCodificado, tipo) {
@@ -522,6 +582,10 @@
     document.getElementById("credencialOperarioCancelar").addEventListener("click", cerrarCredencialOperario);
     document.getElementById("credencialOperarioForm").addEventListener("submit", guardarCredencialOperario);
     document.getElementById("credencialOperarioModal").addEventListener("click", function(e) { if (e.target.id === "credencialOperarioModal") cerrarCredencialOperario(); });
+    document.getElementById("plantasOperarioClose").addEventListener("click", cerrarPlantasOperario);
+    document.getElementById("plantasOperarioCancelar").addEventListener("click", cerrarPlantasOperario);
+    document.getElementById("plantasOperarioGuardar").addEventListener("click", guardarPlantasOperario);
+    document.getElementById("plantasOperarioModal").addEventListener("click", function(e) { if (e.target.id === "plantasOperarioModal") cerrarPlantasOperario(); });
     await cargarMaestros();
     await cargarUsuarios();
     await cargarEstadoSincronizacion();
@@ -531,7 +595,8 @@
     editar: function(id) { abrirModal(usuarios.find(function(u) { return u.id === id; })); },
     eliminar: eliminar,
     crearCuentaOperario: function(numero) { abrirCredencialOperario(numero, "crear"); },
-    restablecerContrasenaOperario: function(numero) { abrirCredencialOperario(numero, "restablecer"); }
+    restablecerContrasenaOperario: function(numero) { abrirCredencialOperario(numero, "restablecer"); },
+    editarPlantasOperario: editarPlantasOperario
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();

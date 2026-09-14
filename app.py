@@ -2,6 +2,7 @@ import logging
 import os
 import hashlib
 import re
+import secrets
 import threading
 from datetime import datetime, timedelta, timezone
 
@@ -77,11 +78,19 @@ PERMISOS_PROVEEDOR = frozenset({
     "reservas:crear", "reservas:ver_propias", "reservas:cancelar_propias",
 })
 
+# Un operario no es un usuario interno genérico: su alcance operativo siempre
+# queda limitado a las plantas que tenga asignadas en ``usuario_plantas``.
+PERMISOS_OPERARIO = frozenset({
+    "menu:reservas", "menu:muelles",
+    "muelles:ver", "reservas:ver", "reservas:actualizar_estado",
+})
+
 PERMISOS_POR_ROL = {
     "admin": PERMISOS_ADMIN,
     "interno": PERMISOS_INTERNO,
     "proveedor": PERMISOS_PROVEEDOR,
     "externo": PERMISOS_PROVEEDOR,  # alias si el rol se llama 'externo'
+    "PLANT_OPERATOR": PERMISOS_OPERARIO,
 }
 
 ROLES_EXTERNOS = frozenset({"proveedor", "externo", "supplier", "supplier_user", "external"})
@@ -257,15 +266,13 @@ def _email_tecnico_operario(numero_operario):
 
 
 def _rol_operario_por_defecto():
-    """Obtiene un rol operativo seguro, sin inferir privilegios de metadatos."""
-    for nombre in ("PLANT_OPERATOR", "interno"):
-        try:
-            filas = supabase.table("roles").select("id,nombre").eq("nombre", nombre).limit(1).execute().data
-            if filas:
-                return filas[0]
-        except Exception:
-            continue
-    return None
+    """Devuelve el rol limitado que se aplica a las cuentas de operario."""
+    try:
+        filas = (supabase.table("roles").select("id,nombre")
+                 .eq("nombre", "PLANT_OPERATOR").limit(1).execute().data or [])
+        return filas[0] if filas else None
+    except Exception:
+        return None
 
 
 @app.route("/")
@@ -494,15 +501,18 @@ def _login_operario_supabase(num_operario, password):
         user = enriquecer_usuario(supabase, user)
     else:
         # Los operarios pueden autenticarse únicamente contra operarios_login.
-        # No se exige una fila equivalente en public.usuarios.
+        # No se exige una fila equivalente en public.usuarios para iniciar
+        # sesión, pero nunca se les concede el rol interno genérico: hasta que
+        # un administrador les asigne plantas su alcance es deliberadamente
+        # vacío.
         user = {
             "id": f"operario:{str(num_operario).strip()}",
             "numero_operario": str(num_operario).strip(),
             "email": datos.get("correo"),
             "nombre": datos.get("nombre") or str(num_operario),
-            "rol": "interno",
-            "roles": ["interno"],
-            "permisos": permisos_de_roles(["interno"]),
+            "rol": "PLANT_OPERATOR",
+            "roles": ["PLANT_OPERATOR"],
+            "permisos": permisos_de_roles(["PLANT_OPERATOR"]),
             "plantas": [],
             "proveedor_id": None,
             "origen_login": "operarios_login",
@@ -2495,6 +2505,26 @@ def api_operarios_administracion():
             .data
         ) or []
         por_numero = {str(cuenta["numero_operario"]): cuenta for cuenta in cuentas}
+        # Plantas asignadas por operario (usuario_plantas -> usuarios.numero_operario)
+        plantas_por_operario = {}
+        try:
+            asignaciones = (
+                supabase.table("usuario_plantas")
+                .select("usuario_id,planta_id,usuarios(numero_operario),plantas(nombre)")
+                .execute()
+                .data
+            ) or []
+            for asignacion in asignaciones:
+                perfil = asignacion.get("usuarios")
+                numero_vinculado = perfil.get("numero_operario") if isinstance(perfil, dict) else None
+                if not numero_vinculado:
+                    continue
+                planta = asignacion.get("plantas")
+                nombre_planta = planta.get("nombre") if isinstance(planta, dict) else None
+                if nombre_planta:
+                    plantas_por_operario.setdefault(str(numero_vinculado), []).append(nombre_planta)
+        except Exception as exc:
+            logger.warning("No se pudieron leer las plantas de los operarios: %s", exc)
         resultado = []
         for operario in operarios:
             cuenta = por_numero.get(str(operario["numero_operario"]))
@@ -2502,11 +2532,148 @@ def api_operarios_administracion():
                 **operario,
                 "tiene_cuenta": bool(cuenta and str(cuenta.get("password_hash") or "").strip()),
                 "cuenta_activa": cuenta.get("activo") if cuenta else False,
+                "plantas": plantas_por_operario.get(str(operario["numero_operario"]), []),
             })
         return jsonify({"operarios": resultado})
     except Exception as exc:
         logger.exception("No se pudieron listar operarios: %s", exc)
         return jsonify({"error": "No se pudieron consultar los operarios sincronizados."}), 500
+
+
+def _buscar_perfil_operario(numero):
+    """Perfil de public.usuarios vinculado a un número de operario (sin crear)."""
+    numero = str(numero).strip()
+    try:
+        filas = (
+            supabase.table("usuarios").select("*")
+            .eq("numero_operario", numero).limit(1).execute().data or []
+        )
+        if filas:
+            return filas[0]
+    except Exception:
+        pass
+    try:
+        cred = (
+            supabase.table("operarios_login").select("usuario_id")
+            .eq("numero_operario", numero).limit(1).execute().data or []
+        )
+        if cred and cred[0].get("usuario_id"):
+            filas = (
+                supabase.table("usuarios").select("*")
+                .eq("id", cred[0]["usuario_id"]).limit(1).execute().data or []
+            )
+            if filas:
+                return filas[0]
+    except Exception:
+        pass
+    return None
+
+
+def _garantizar_perfil_operario(numero):
+    """Perfil del operario; lo crea con identidad técnica si no existe."""
+    numero = str(numero).strip()
+    existente = _buscar_perfil_operario(numero)
+    if existente:
+        return existente
+
+    nombre = numero
+    try:
+        censo = (
+            supabase.table("operarios_corporativos").select("nombre")
+            .eq("numero_operario", numero).limit(1).execute().data or []
+        )
+        if censo:
+            nombre = censo[0].get("nombre") or numero
+    except Exception:
+        pass
+
+    email_tecnico = _email_tecnico_operario(numero)
+    uid = None
+    try:
+        creado = supabase.auth.admin.create_user({
+            "email": email_tecnico,
+            "password": secrets.token_urlsafe(32),
+            "email_confirm": True,
+        })
+        uid = creado.user.id
+    except Exception as exc:
+        logger.exception("No se pudo crear la identidad técnica del operario %s: %s", numero, exc)
+        try:
+            usuarios_auth = supabase.auth.admin.list_users()
+            for usuario_auth in usuarios_auth:
+                if getattr(usuario_auth, "email", None) == email_tecnico:
+                    uid = getattr(usuario_auth, "id", None)
+                    break
+        except Exception:
+            pass
+    if not uid:
+        raise RuntimeError("No se pudo resolver una identidad para el operario.")
+
+    rol = _rol_operario_por_defecto()
+    if not rol:
+        raise RuntimeError("Falta el rol PLANT_OPERATOR; aplica las migraciones antes de asignar plantas.")
+    partes = str(nombre).split(None, 1)
+    perfil = {
+        "id": uid,
+        "nombre": partes[0],
+        "apellidos": partes[1] if len(partes) > 1 else None,
+        "rol_id": rol["id"] if rol else None,
+        "numero_operario": numero,
+        "origen_operario": "EMESA",
+        "tipo_registro": "OPERARIO",
+        "email_tecnico": email_tecnico,
+        "activo": True,
+    }
+    supabase.table("usuarios").upsert(perfil).execute()
+    try:
+        supabase.table("operarios_login").update({"usuario_id": uid}).eq("numero_operario", numero).execute()
+    except Exception:
+        pass
+    return supabase.table("usuarios").select("*").eq("id", uid).single().execute().data
+
+
+@app.route("/api/admin/operarios/<numero_operario>/plantas", methods=["GET", "PUT"])
+def api_operario_plantas(numero_operario):
+    """Plantas asignadas a un operario (alcance de ``usuario_plantas``)."""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+    if not usuario_actual_es_administrador():
+        return jsonify({"error": "No tienes permisos para gestionar operarios."}), 403
+    numero = str(numero_operario or "").strip()
+    if not numero:
+        return jsonify({"error": "Indica el número de operario."}), 400
+
+    try:
+        if request.method == "GET":
+            perfil = _buscar_perfil_operario(numero)
+            if not perfil:
+                return jsonify({"usuario_id": None, "planta_ids": []})
+            asignadas = (
+                supabase.table("usuario_plantas").select("planta_id")
+                .eq("usuario_id", perfil["id"]).execute().data or []
+            )
+            return jsonify({"usuario_id": perfil["id"], "planta_ids": [a["planta_id"] for a in asignadas]})
+
+        perfil = _garantizar_perfil_operario(numero)
+        usuario_id = perfil["id"]
+        ids = list(dict.fromkeys((request.json or {}).get("planta_ids") or []))
+        validos = []
+        for planta_id in ids:
+            try:
+                existe = supabase.table("plantas").select("id").eq("id", planta_id).limit(1).execute().data
+                if existe:
+                    validos.append(planta_id)
+            except Exception:
+                continue
+        supabase.table("usuario_plantas").delete().eq("usuario_id", usuario_id).execute()
+        if validos:
+            supabase.table("usuario_plantas").insert(
+                [{"usuario_id": usuario_id, "planta_id": planta_id} for planta_id in validos]
+            ).execute()
+        return jsonify({"ok": True, "asignadas": len(validos)})
+    except Exception as exc:
+        logger.exception("No se pudieron gestionar las plantas del operario %s: %s", numero, exc)
+        return jsonify({"error": "No se pudieron gestionar las plantas del operario."}), 500
 
 
 @app.route("/api/admin/operarios/<numero_operario>/restablecer-contrasena", methods=["POST"])

@@ -334,8 +334,8 @@
       </div>
       <div class="crud-modal-body" style="overflow:auto;max-height:62vh;">
         <table>
-          <thead><tr><th data-original-text="Número">Número</th><th data-original-text="Nombre">Nombre</th><th data-original-text="Estado">Estado</th><th data-original-text="Cuenta">Cuenta</th><th data-original-text="Acciones">Acciones</th></tr></thead>
-          <tbody id="operariosTbody"><tr><td colspan="5" class="empty-state">Cargando...</td></tr></tbody>
+          <thead><tr><th data-original-text="Número">Número</th><th data-original-text="Nombre">Nombre</th><th data-original-text="Estado">Estado</th><th data-original-text="Cuenta">Cuenta</th><th data-original-text="Plantas">Plantas</th><th data-original-text="Acciones">Acciones</th></tr></thead>
+          <tbody id="operariosTbody"><tr><td colspan="6" class="empty-state">Cargando...</td></tr></tbody>
         </table>
         <div class="buscador-wrap" style="margin-top:16px;">
           <span class="buscador-icono">🔍</span>
@@ -361,6 +361,23 @@
       <div class="crud-modal-foot">
         <button type="button" class="btn" id="credencialOperarioCancelar" data-original-text="Cancelar">Cancelar</button>
         <button type="submit" form="credencialOperarioForm" class="btn btn-exito" id="credencialOperarioGuardar" data-original-text="Guardar">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="crud-modal-overlay" id="plantasOperarioModal">
+    <div class="crud-modal" style="max-width:560px;">
+      <div class="crud-modal-head">
+        <h3 id="plantasOperarioTitulo" data-original-text="Plantas del operario">Plantas del operario</h3>
+        <button class="crud-modal-close" id="plantasOperarioClose" title="Cerrar" data-original-title="Cerrar">✕</button>
+      </div>
+      <div class="crud-modal-body">
+        <p id="plantasOperarioTexto" style="margin-top:0;"></p>
+        <div class="roles-box" id="plantasOperarioBox"></div>
+      </div>
+      <div class="crud-modal-foot">
+        <button type="button" class="btn" id="plantasOperarioCancelar" data-original-text="Cancelar">Cancelar</button>
+        <button type="button" class="btn btn-exito" id="plantasOperarioGuardar" data-original-text="Guardar">Guardar</button>
       </div>
     </div>
   </div>

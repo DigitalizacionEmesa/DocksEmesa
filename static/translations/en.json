@@ -406,5 +406,9 @@
   "Confirmar contraseña": "Confirm password",
   "Repite la contraseña": "Repeat the password",
   "Opcional": "Optional",
-  "📋 Informe de reserva": "📋 Booking report"
+  "📋 Informe de reserva": "📋 Booking report",
+  "Plantas del operario": "Operator plants",
+  "Selecciona las plantas a las que tendrá acceso": "Select the plants they will be able to access",
+  "No se pudieron cargar las plantas.": "The plants could not be loaded.",
+  "Plantas actualizadas": "Plants updated"
 }

@@ -24,14 +24,15 @@ def _sin_duplicados(secuencia):
 
 def _conexion():
     """Abre una conexión ODBC probando servidores y drivers disponibles."""
-    servers = _sin_duplicados(
-        [config.DATALAKE_SERVER] + config.DATALAKE_SERVERS + ["EMEBIDWH", "172.16.10.10"]
-    )
+    servers = _sin_duplicados([config.DATALAKE_SERVER] + config.DATALAKE_SERVERS)
     drivers = _sin_duplicados(
         [config.DATALAKE_DRIVER]
         + config.DATALAKE_DRIVERS
         + ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server", "SQL Server"]
     )
+
+    if not servers or not all((config.DATALAKE_DATABASE, config.DATALAKE_USER, config.DATALAKE_PASSWORD)):
+        raise RuntimeError("Faltan variables DATALAKE_* para conectar con el Data Lake.")
 
     ultimo_error = None
     for driver in drivers:
