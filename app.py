@@ -278,11 +278,15 @@ def _email_tecnico_operario(numero_operario):
 
 
 def _rol_operario_por_defecto():
-    """Devuelve el rol limitado que se aplica a las cuentas de operario."""
+    """Devuelve el rol limitado, tolerando nombres antiguos de la BD."""
     try:
-        filas = (supabase.table("roles").select("id,nombre")
-                 .eq("nombre", "PLANT_OPERATOR").limit(1).execute().data or [])
-        return filas[0] if filas else None
+        filas = supabase.table("roles").select("*").execute().data or []
+        for fila in filas:
+            nombre = str(fila.get("nombre") or fila.get("name") or "")
+            normalizado = re.sub(r"[\s-]+", "_", nombre.strip().upper())
+            if normalizado in {"PLANT_OPERATOR", "PLANTOPERADOR"}:
+                return fila
+        return None
     except Exception:
         return None
 
@@ -2617,8 +2621,11 @@ def _garantizar_perfil_operario(numero):
         logger.exception("No se pudo crear la identidad técnica del operario %s: %s", numero, exc)
         try:
             usuarios_auth = supabase.auth.admin.list_users()
-            for usuario_auth in usuarios_auth:
-                if getattr(usuario_auth, "email", None) == email_tecnico:
+            lista_auth = getattr(usuarios_auth, "users", usuarios_auth)
+            if isinstance(lista_auth, dict):
+                lista_auth = lista_auth.get("users", [])
+            for usuario_auth in (lista_auth or []):
+                if str(getattr(usuario_auth, "email", "") or "").strip().casefold() == email_tecnico.casefold():
                     uid = getattr(usuario_auth, "id", None)
                     break
         except Exception:
@@ -2679,13 +2686,10 @@ def api_operario_plantas(numero_operario):
         usuario_id = perfil["id"]
         body = request.json or {}
         ids = list(dict.fromkeys(body.get("planta_ids") or []))
-        rol_id = body.get("rol_id")
-        if rol_id:
-            rol = (supabase.table("roles").select("*")
-                   .eq("id", rol_id).limit(1).execute().data or [])
-            if not rol or _es_rol_externo(rol[0].get("nombre") or rol[0].get("name")):
-                return jsonify({"error": "El operario debe tener un rol interno."}), 400
-            supabase.table("usuarios").update({"rol_id": rol_id}).eq("id", usuario_id).execute()
+        rol = _rol_operario_por_defecto()
+        if not rol:
+            return jsonify({"error": "No existe el rol de operario en Supabase."}), 503
+        supabase.table("usuarios").update({"rol_id": rol["id"]}).eq("id", usuario_id).execute()
         validos = []
         for planta_id in ids:
             try:

@@ -343,18 +343,11 @@
     document.getElementById("plantasOperarioTexto").textContent =
       t("Selecciona las plantas a las que tendrá acceso") + " " + nombre + " (" + numero + ").";
     var box = document.getElementById("plantasOperarioBox");
-    var roleSelect = document.getElementById("plantasOperarioRol");
-    var rolesInternos = roles.filter(function(r) { return !esRolExterno(r); });
-    roleSelect.innerHTML = rolesInternos.map(function(r) {
-      return "<option value=\"" + r.id + "\">" + esc(r.nombre) + "</option>";
-    }).join("");
     box.innerHTML = "<div style=\"color:#888;font-size:.85rem;\">" + t("Cargando...") + "</div>";
     document.getElementById("plantasOperarioModal").classList.add("active");
     SupabaseApp.api("/api/admin/operarios/" + encodeURIComponent(numero) + "/plantas")
       .then(function(data) {
         var actuales = data.planta_ids || [];
-        var rolActual = data.rol_id || ((roles.find(function(r) { return String(r.nombre).toUpperCase() === "PLANT_OPERATOR"; }) || {}).id);
-        if (rolActual) roleSelect.value = rolActual;
         box.innerHTML = plantas.length
           ? plantas.map(function(p) {
               var marcada = actuales.indexOf(p.id) !== -1 ? " checked" : "";
@@ -376,13 +369,12 @@
   async function guardarPlantasOperario() {
     if (!operarioPlantasActual) return;
     var ids = Array.prototype.slice.call(document.querySelectorAll(".op-chk:checked")).map(function(c) { return c.value; });
-    var rolId = document.getElementById("plantasOperarioRol").value;
     var btn = document.getElementById("plantasOperarioGuardar");
     btn.disabled = true;
     try {
       await SupabaseApp.api("/api/admin/operarios/" + encodeURIComponent(operarioPlantasActual.numero) + "/plantas", {
         method: "PUT",
-        body: { planta_ids: ids, rol_id: rolId }
+        body: { planta_ids: ids }
       });
       cerrarPlantasOperario();
       await abrirModalOperarios();
