@@ -385,8 +385,26 @@
         method: "PUT",
         body: { planta_ids: ids }
       });
+      var actualizado = operarios.find(function(item) {
+        return String(item.numero_operario) === String(operarioPlantasActual.numero);
+      });
+      if (actualizado) {
+        actualizado.plantas = ids.map(function(id) {
+          var planta = plantas.find(function(item) { return String(item.id) === String(id); });
+          return planta ? planta.nombre : id;
+        });
+        // Si el gestor ya estaba abierto, actualizarlo en el acto sin volver
+        // a abrir el modal ni cambiar el contexto del usuario.
+        if (document.getElementById("operariosModal").classList.contains("active")) {
+          pintarOperarios();
+        }
+      }
+      try {
+        var up = await SupabaseApp.api("/api/crud/usuario_plantas?limit=1000");
+        todasUP = up.datos || [];
+        refrescarListado();
+      } catch (e2) {}
       cerrarPlantasOperario();
-      await abrirModalOperarios();
       notificar(t("Plantas actualizadas"), "success");
     } catch (err) {
       notificar(t("Error") + ": " + mensajeErrorAmigable(err), "error");
@@ -559,6 +577,8 @@
       return;
     }
     document.getElementById("btnAltaAcceso").addEventListener("click", abrirAltaAcceso);
+    var botonGestionarUsuarios = document.getElementById("btnGestionarUsuarios");
+    if (botonGestionarUsuarios) botonGestionarUsuarios.addEventListener("click", abrirModalOperarios);
     document.getElementById("altaAccesoModalClose").addEventListener("click", cerrarAltaAcceso);
     document.getElementById("altaAccesoModal").addEventListener("click", function(e) { if (e.target.id === "altaAccesoModal") cerrarAltaAcceso(); });
     document.getElementById("altaInterno").addEventListener("click", function() { cerrarAltaAcceso(); abrirModalInvitacion("INTERNO"); });
